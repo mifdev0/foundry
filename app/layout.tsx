@@ -6,7 +6,7 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
   title: "Foundry",
-  description: "Personal learning path builder untuk developer",
+  description: "Personal learning path builder untuk semua bidang dan topik belajar",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

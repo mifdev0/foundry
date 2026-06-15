@@ -66,44 +66,57 @@ function hasCustomHook(text: string, topic?: string) {
 function checkRequirement(requirement: string, submission: string): RequirementCheck {
   const req = requirement.toLowerCase();
   const text = submission.toLowerCase();
-  let met = false;
 
-  if (req.includes("react router") || req.includes("perpindahan antar halaman") || req.includes("routing")) {
-    met = /browserrouter|createbrowserrouter|routes|route|link|usenavigate|navigate\(/i.test(submission);
-  } else if (req.includes("state management") || req.includes("data pengguna") || req.includes("user")) {
-    const hasStateTool = /usestate|usereducer|createcontext|usecontext|redux|zustand|provider|dispatch|set[A-Z]/.test(text);
-    const hasUserData = /user|username|email|password|auth|login/.test(text);
-    const onlyLinkLogin = /<link[^>]+to=["']\/?dashboard["']/i.test(submission) && !/onsubmit|handlelogin|setuser|setauth|navigate\(/i.test(submission);
-    met = hasStateTool && hasUserData && !onlyLinkLogin;
-  } else if (req.includes("custom hook") || req.includes("custom hooks")) {
-    met = hasCustomHook(submission, req.includes("tema") || req.includes("theme") ? "theme" : undefined);
-  } else if (req.includes("tema") || req.includes("theme")) {
-    met = /theme|dark|light|toggletheme|settheme|usetheme/i.test(submission) && /usestate|usereducer|createcontext|className|data-theme|style=/i.test(submission);
-  } else if (req.includes("login")) {
-    met = /onsubmit|handlelogin|setuser|setauth|navigate\(/i.test(submission) && /username|email|password/i.test(submission);
-  } else if (req.includes("tambah") && req.includes("todo")) {
-    met = /addtodo|settodos|push|concat|\[\s*\.\.\.todos/i.test(submission);
-  } else if (req.includes("hapus") && req.includes("todo")) {
-    met = /deletetodo|removetodo|filter\(/i.test(submission);
-  } else if ((req.includes("update") || req.includes("edit")) && req.includes("todo")) {
-    met = /updatetodo|edittodo|map\(/i.test(submission) && /settodos/i.test(submission);
-  } else if (req.includes("useeffect")) {
-    met = /useeffect\s*\(/i.test(submission);
-  } else if (req.includes("array")) {
-    met = /\[[\s\S]*\]/.test(submission) || /\.map\(|\.filter\(|\.reduce\(/i.test(submission);
-  } else if (req.includes("object")) {
-    met = /\{[\s\S]*:[\s\S]*\}/.test(submission);
-  } else if (req.includes("function") || req.includes("fungsi")) {
-    met = /function\s+\w+|\([^)]*\)\s*=>|const\s+\w+\s*=\s*\([^)]*\)\s*=>/i.test(submission);
-  } else if (req.includes("conditional") || req.includes("if") || req.includes("kondisi")) {
-    met = /\bif\s*\(|\?|switch\s*\(/i.test(submission);
-  } else if (req.includes("loop")) {
-    met = /\bfor\s*\(|\bwhile\s*\(|\.map\(|\.forEach\(|\.reduce\(/i.test(submission);
+  if (submission.trim().length < 15) {
+    return {
+      label: requirement,
+      met: false,
+      issue: `Requirement belum terpenuhi karena jawaban terlalu pendek: ${requirement}`
+    };
+  }
+
+  const isCodingReq = req.includes("route") || req.includes("routing") || req.includes("state") || req.includes("hook") || req.includes("useeffect") || req.includes("array") || req.includes("object") || req.includes("loop") || req.includes("function") || req.includes("fungsi");
+  const isCodingSubmission = text.includes("const ") || text.includes("let ") || text.includes("function") || text.includes("=>") || text.includes("{") || text.includes(";");
+
+  let met = false;
+  if (isCodingReq && isCodingSubmission) {
+    if (req.includes("react router") || req.includes("perpindahan antar halaman") || req.includes("routing")) {
+      met = /browserrouter|createbrowserrouter|routes|route|link|usenavigate|navigate\(/i.test(submission);
+    } else if (req.includes("state management") || req.includes("data pengguna") || req.includes("user")) {
+      const hasStateTool = /usestate|usereducer|createcontext|usecontext|redux|zustand|provider|dispatch|set[A-Z]/.test(text);
+      const hasUserData = /user|username|email|password|auth|login/.test(text);
+      met = hasStateTool && hasUserData;
+    } else if (req.includes("custom hook") || req.includes("custom hooks")) {
+      met = hasCustomHook(submission, req.includes("tema") || req.includes("theme") ? "theme" : undefined);
+    } else if (req.includes("tema") || req.includes("theme")) {
+      met = /theme|dark|light|toggletheme|settheme|usetheme/i.test(submission);
+    } else if (req.includes("login")) {
+      met = /username|email|password|login/i.test(submission);
+    } else if (req.includes("tambah") && req.includes("todo")) {
+      met = /addtodo|settodos|push|concat|\[\s*\.\.\.todos/i.test(submission);
+    } else if (req.includes("useeffect")) {
+      met = /useeffect\s*\(/i.test(submission);
+    } else if (req.includes("array")) {
+      met = /\[[\s\S]*\]/.test(submission) || /\.map\(|\.filter\(|\.reduce\(/i.test(submission);
+    } else if (req.includes("object")) {
+      met = /\{[\s\S]*:[\s\S]*\}/.test(submission);
+    } else if (req.includes("function") || req.includes("fungsi")) {
+      met = /function\s+\w+|\([^)]*\)\s*=>|const\s+\w+\s*=\s*\([^)]*\)\s*=>/i.test(submission);
+    } else if (req.includes("conditional") || req.includes("if") || req.includes("kondisi")) {
+      met = /\bif\s*\(|\?|switch\s*\(/i.test(submission);
+    } else if (req.includes("loop")) {
+      met = /\bfor\s*\(|\bwhile\s*\(|\.map\(|\.forEach\(|\.reduce\(/i.test(submission);
+    } else {
+      const words = req
+        .split(/[^a-z0-9]+/i)
+        .filter((word) => word.length > 4 && !["menggunakan", "dengan", "untuk", "aplikasi", "secara", "benar"].includes(word));
+      met = words.length === 0 || words.some((word) => text.includes(word));
+    }
   } else {
     const words = req
       .split(/[^a-z0-9]+/i)
-      .filter((word) => word.length > 4 && !["menggunakan", "dengan", "untuk", "aplikasi", "secara", "benar"].includes(word));
-    met = words.length === 0 || words.some((word) => text.includes(word));
+      .filter((word) => word.length > 4 && !["menggunakan", "dengan", "untuk", "tugas", "studi", "kasus", "materi", "secara", "benar"].includes(word));
+    met = words.length === 0 || words.some((word) => text.includes(word)) || text.length > 40;
   }
 
   return {
@@ -118,16 +131,16 @@ function auditSubmission(submission: string, caseStudy?: CaseStudy) {
   const missingRequirements = checks.filter((item) => !item.met);
   const text = submission.toLowerCase();
   const selfDeclaredIncomplete =
-    /belum ada|belum dibuat|tidak ada|cuma fokus|hanya fokus|baru memenuhi|minimal.*requirement|belum.*state management|belum.*custom hook|belum.*tema/.test(text);
+    /belum ada|belum dibuat|tidak ada|cuma fokus|hanya fokus|belum selesai/i.test(text);
   const missingCount = missingRequirements.length + (selfDeclaredIncomplete ? 1 : 0);
-  const scoreCap = missingCount === 0 ? 100 : missingCount === 1 ? 65 : missingCount === 2 ? 50 : 40;
+  const scoreCap = selfDeclaredIncomplete ? 65 : 100;
 
   return {
     checks,
     missingRequirements,
     selfDeclaredIncomplete,
     scoreCap,
-    canPass: missingRequirements.length === 0 && !selfDeclaredIncomplete
+    canPass: submission.trim().length >= 15 && !selfDeclaredIncomplete
   };
 }
 
@@ -147,42 +160,30 @@ function enforceAudit(evaluation: Evaluation, submission: string, caseStudy?: Ca
     feedback: passed
       ? evaluation.feedback
       : auditIssues.length
-        ? `Belum lulus karena masih ada requirement wajib yang belum terbukti di submission. ${evaluation.feedback}`
+        ? `Belum lulus karena masih ada requirement wajib yang belum terpenuhi. ${evaluation.feedback}`
         : evaluation.feedback,
     issues: auditIssues.length ? auditIssues : Array.from(new Set(evaluation.issues)),
     nextSteps: passed
       ? evaluation.nextSteps
-      : Array.from(new Set(["Lengkapi semua requirement wajib, bukan hanya konsep utama.", "Submit kode lengkap yang menunjukkan fitur bekerja.", ...(auditNextSteps.length ? auditNextSteps : evaluation.nextSteps)]))
+      : Array.from(new Set(["Lengkapi semua requirement wajib dari studi kasus.", "Berikan jawaban atau penjelasan yang detail untuk membuktikan pemahaman Anda.", ...(auditNextSteps.length ? auditNextSteps : evaluation.nextSteps)]))
   };
 }
 
 function fallbackEvaluation(submission: string, nodes: ForgeNode[] = [], caseStudy?: CaseStudy): Evaluation {
-  const text = submission.toLowerCase();
-  const target = nodes.at(-1);
-  const tasks = target?.tasks ?? [];
-  const concepts = tasks.join(" ").toLowerCase();
-  const checks = [
-    text.includes("function") || text.includes("=>"),
-    text.includes("if") || text.includes("?"),
-    text.includes("for") || text.includes("map") || text.includes("foreach"),
-    text.includes("[") && text.includes("]"),
-    text.includes("{") && text.includes("}")
-  ];
-  const score = Math.round((checks.filter(Boolean).length / checks.length) * 100);
-  const passed = score >= 70;
+  const text = submission.trim();
+  const wordCount = text.split(/\s+/).filter(Boolean).length;
+  const tooShort = wordCount < 10;
+  const passed = !tooShort && text.length > 40;
+  const score = passed ? 80 : 45;
 
   const evaluation: Evaluation = {
     passed,
     score,
     feedback: passed
-      ? "Solusi sudah memenuhi mayoritas requirement studi kasus dan cukup untuk lanjut."
-      : "Solusi belum cukup memenuhi requirement utama. Lengkapi bagian konsep yang masih kosong.",
-    issues: checks
-      .map((ok, index) => ({ ok, label: ["Function belum terlihat", "Conditional belum terlihat", "Loop belum terlihat", "Array belum terlihat", "Object belum terlihat"][index] }))
-      .filter((item) => !item.ok)
-      .map((item) => item.label)
-      .concat(concepts && submission.length < 80 ? ["Jawaban terlalu pendek untuk divalidasi mendalam"] : []),
-    nextSteps: passed ? ["Lanjutkan ke node berikutnya."] : ["Perbaiki submission sesuai issue.", "Pastikan kode bisa dijalankan tanpa syntax error.", "Tambahkan contoh output."]
+      ? "Solusi sudah memenuhi kriteria dasar studi kasus."
+      : "Solusi belum cukup memenuhi kriteria. Lengkapi jawaban Anda agar lebih detail.",
+    issues: tooShort ? ["Jawaban terlalu pendek (minimal 10 kata)"] : [],
+    nextSteps: passed ? ["Lanjutkan ke node berikutnya."] : ["Tulis jawaban yang lebih detail sesuai studi kasus."]
   };
   return enforceAudit(evaluation, submission, caseStudy);
 }
@@ -214,7 +215,7 @@ export async function POST(request: Request) {
         {
           role: "system",
           content:
-            "Kamu adalah evaluator coding yang ketat untuk Forge Test. Nilai submission user terhadap studi kasus. Balas hanya JSON valid dengan shape {\"passed\":boolean,\"score\":number,\"feedback\":string,\"issues\":string[],\"nextSteps\":string[]}. Passing score minimal 70, tetapi user hanya boleh lulus jika SEMUA requirement wajib terbukti ada di kode/pseudocode. Jangan memberi nilai tinggi hanya karena ada sebagian konsep. Jika ada requirement tidak diimplementasikan, missing, hanya diklaim, atau user mengakui belum dibuat, score maksimal 65 dan passed harus false. Login dengan Link langsung ke dashboard bukan state management/auth yang valid. Custom hook harus berupa function/const bernama useX. Tema harus punya state/toggle/theme handling yang terlihat. Cantumkan requirement yang hilang di issues."
+            "Kamu adalah evaluator ahli untuk Forge Test. Nilai submission/jawaban user terhadap studi kasus/tugas yang diberikan. Tugas bisa berupa coding, penjelasan konsep, studi kasus bisnis, desain, bahasa, atau topik lainnya sesuai materi node. Balas hanya JSON valid dengan shape {\"passed\":boolean,\"score\":number,\"feedback\":string,\"issues\":string[],\"nextSteps\":string[]}. Passing score minimal 70, tetapi user hanya boleh lulus jika SEMUA requirement wajib terbukti telah dikerjakan atau dijawab dengan benar di dalam submission. Jangan memberi nilai tinggi jika solusi tidak lengkap atau tidak menjawab esensi tugas. Jika ada requirement tidak dikerjakan, salah, atau tidak sesuai skenario, score maksimal 65 dan passed harus false. Tulis feedback yang konstruktif dan cantumkan detail issue/requirement yang belum terpenuhi di issues."
         },
         {
           role: "user",
@@ -257,7 +258,7 @@ export async function POST(request: Request) {
       {
         role: "system",
         content:
-          "Buat Forge Test berbentuk studi kasus/praktik, bukan pilihan ganda. Balas hanya JSON valid dengan shape {\"title\":string,\"scenario\":string,\"requirements\":string[],\"expectedOutput\":string,\"evaluationCriteria\":string[]}. Studi kasus WAJIB berdasarkan targetNode.title, targetNode.description, dan targetNode.tasks saja. nodes hanya konteks prasyarat, jangan mengambil topik baru dari node lain. Jangan menyebut teknologi/topik yang tidak ada di targetNode. Setiap request harus membuat project mini yang berbeda/variatif sesuai randomSeed, jangan mengulang scenario lama. Scenario harus spesifik: apa yang dibuat, data/input yang dipakai, proses yang harus dilakukan, dan output yang diharapkan. Requirement harus menguji semua task utama dari targetNode."
+          "Buat Forge Test berbentuk studi kasus/praktik/tugas, bukan pilihan ganda. Balas hanya JSON valid dengan shape {\"title\":string,\"scenario\":string,\"requirements\":string[],\"expectedOutput\":string,\"evaluationCriteria\":string[]}. Studi kasus/tugas WAJIB berdasarkan targetNode.title, targetNode.description, dan targetNode.tasks saja. nodes hanya konteks prasyarat, jangan mengambil topik baru dari node lain. Jangan menyebut teknologi/topik/konsep yang tidak ada di targetNode. Setiap request harus membuat skenario/tugas yang berbeda/variatif sesuai randomSeed, jangan mengulang skenario lama. Skenario harus spesifik: apa yang harus diselesaikan, data/input yang digunakan (jika ada), proses/analisis/langkah yang harus dilakukan, dan format jawaban yang diharapkan. Requirement harus menguji semua task utama dari targetNode."
       },
       {
         role: "user",

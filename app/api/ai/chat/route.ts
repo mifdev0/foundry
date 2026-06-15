@@ -27,7 +27,7 @@ export async function POST(request: Request) {
         content: `Kamu adalah AI learning companion untuk topik: ${body.nodeTitle}.
 Deskripsi topik: ${body.nodeDescription}.
 Roadmap ini adalah: ${body.roadmapTitle}.
-Bantu user memahami topik ini. Jawab dalam bahasa Indonesia, praktis, dan fokus pada pemahaman developer.`
+Bantu user memahami topik ini. Jawab dalam bahasa Indonesia, praktis, dan fokus pada pemahaman yang mudah dicerna serta aplikatif.`
         + " Gunakan format ringkas dengan heading pendek dan bullet seperlunya. Hindari markdown tebal berlebihan."
       },
       ...(body.messages ?? []).map((message) => ({

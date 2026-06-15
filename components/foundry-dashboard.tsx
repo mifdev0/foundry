@@ -447,7 +447,7 @@ const starterRoadmap = (): Roadmap => {
   return {
     id: "roadmap-1",
     title: "Software Architecture Mastery",
-    description: "Roadmap personal untuk menguatkan fundamental developer.",
+    description: "Roadmap personal untuk menguasai topik ini secara bertahap.",
     updatedAt: new Date().toISOString(),
     nodes,
     edges: [makeEdge("n1", "n2"), makeEdge("n2", "n3"), makeEdge("n2", "n4")]
@@ -1530,7 +1530,7 @@ export default function FoundryDashboard() {
                     {selectedNode.data.forgePassed ? <Unlock className="text-emerald-600" size={19} /> : <Lock className="text-primary" size={19} />}
                     Forge Test Gateway
                   </div>
-                  <p className="text-sm leading-6 text-on-variant">Studi kasus coding ini menjadi syarat untuk membuka node yang bergantung pada topik ini.</p>
+                  <p className="text-sm leading-6 text-on-variant">Studi kasus ini menjadi syarat untuk membuka node yang bergantung pada topik ini.</p>
                   <div className={clsx("mt-3 rounded-lg border px-3 py-2 text-xs font-semibold", forgeExpired(selectedNode) ? "border-red-200 bg-red-50 text-red-700" : "border-outline-variant bg-white text-on-variant")}>
                     {selectedNode.data.forgeCaseStudy && forgeCaseLooksValid(selectedNode)
                       ? `Deadline pengerjaan: ${formatForgeDeadline(selectedNode.data.forgeExpiresAt)}`
@@ -1814,7 +1814,7 @@ export default function FoundryDashboard() {
               <div>
                 <h3 className="text-xl font-bold">Forge Case Study: {selectedNode.data.title}</h3>
                 <p className="text-sm text-on-variant">
-                  {evaluation ? `Skor: ${evaluation.score}/100 - ${evaluation.passed ? "Lulus" : "Belum lulus"}` : "Passing score 70%. Submit kode atau pseudocode dari studi kasus, lalu AI akan menilai kecocokan solusi."}
+                  {evaluation ? `Skor: ${evaluation.score}/100 - ${evaluation.passed ? "Lulus" : "Belum lulus"}` : "Passing score 70%. Kirimkan jawaban/solusi Anda sesuai instruksi studi kasus di atas untuk dinilai oleh AI."}
                 </p>
                 <p className={clsx("mt-1 text-xs font-semibold", forgeExpired(selectedNode) ? "text-red-600" : "text-on-variant")}>
                   Deadline: {formatForgeDeadline(selectedNode.data.forgeExpiresAt)}
@@ -1870,13 +1870,13 @@ export default function FoundryDashboard() {
 
                 <div className="space-y-4">
                   <label className="block">
-                    <span className="font-geist text-xs font-bold uppercase tracking-[0.08em] text-on-variant">Submission kode / pseudocode</span>
+                    <span className="font-geist text-xs font-bold uppercase tracking-[0.08em] text-on-variant">Jawaban / Solusi Studi Kasus</span>
                     <textarea
                       value={submission}
                       onChange={(event) => setSubmission(event.target.value)}
                       spellCheck={false}
-                      className="mt-2 min-h-[320px] w-full resize-y rounded-xl border border-outline-variant bg-slate-950 p-4 font-mono text-sm leading-6 text-slate-100 outline-none focus:ring-2 focus:ring-primary-container/30"
-                      placeholder={`// Tempel kode JavaScript atau pseudocode kamu di sini\n// AI akan cek requirement, typo/syntax jelas, dan logika solusi`}
+                      className="mt-2 min-h-[320px] w-full resize-y rounded-xl border border-outline-variant bg-slate-50 p-4 text-sm leading-6 text-on-surface outline-none focus:ring-2 focus:ring-primary-container/30"
+                      placeholder={`Tulis atau tempel jawaban Anda di sini...\n(Bisa berupa penjelasan konsep, analisis studi kasus, kode program, atau format lain sesuai instruksi tugas)`}
                     />
                   </label>
 
