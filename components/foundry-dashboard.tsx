@@ -9,11 +9,9 @@ import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import {
   Background,
   BackgroundVariant,
-  BaseEdge,
   Connection,
   Controls,
   Edge,
-  EdgeProps,
   Handle,
   MarkerType,
   MiniMap,
@@ -23,8 +21,6 @@ import {
   ReactFlow,
   addEdge,
   applyEdgeChanges,
-  getBezierPath,
-  useInternalNode,
   useEdgesState,
   useNodesState
 } from "@xyflow/react";
@@ -134,7 +130,7 @@ const makeEdge = (source: string, target: string): Edge => ({
   id: `${source}-${target}`,
   source,
   target,
-  type: "floating",
+  type: "bezier",
   animated: false,
   markerEnd: { type: MarkerType.ArrowClosed, color: "#8127cf" },
   style: { stroke: "#8127cf", strokeWidth: 2.25 }
@@ -463,7 +459,10 @@ function SkillCard({ data, selected }: NodeProps<SkillNode>) {
         </div>
       )}
 
-      <Handle type="target" position={Position.Left} className="!h-3 !w-3 !border-[3px] !border-white !bg-secondary !shadow-sm" />
+      <Handle id="target-left" type="target" position={Position.Left} className="foundry-node-handle" />
+      <Handle id="target-right" type="target" position={Position.Right} className="foundry-node-handle" />
+      <Handle id="target-top" type="target" position={Position.Top} className="foundry-node-handle" />
+      <Handle id="target-bottom" type="target" position={Position.Bottom} className="foundry-node-handle" />
       
       <div className="mb-4 flex items-center justify-between">
         <div className={clsx("rounded-full px-3 py-1 text-[10px] font-bold tracking-widest uppercase", meta.className)}>
@@ -533,102 +532,36 @@ function SkillCard({ data, selected }: NodeProps<SkillNode>) {
         )}
       </div>
 
-      <Handle type="source" position={Position.Right} className="!h-3 !w-3 !border-[3px] !border-white !bg-secondary !shadow-sm" />
+      <Handle id="source-left" type="source" position={Position.Left} className="foundry-node-handle" />
+      <Handle id="source-right" type="source" position={Position.Right} className="foundry-node-handle" />
+      <Handle id="source-top" type="source" position={Position.Top} className="foundry-node-handle" />
+      <Handle id="source-bottom" type="source" position={Position.Bottom} className="foundry-node-handle" />
     </div>
   );
 }
 
-type FloatingNodeBox = {
-  internals?: { positionAbsolute?: { x: number; y: number } };
-  positionAbsolute?: { x: number; y: number };
-  position?: { x: number; y: number };
-  measured?: { width?: number; height?: number };
-  width?: number;
-  height?: number;
-};
+const nodeTypes = { skill: SkillCard };
 
-function nodeBox(node: FloatingNodeBox) {
-  const position = node.internals?.positionAbsolute ?? node.positionAbsolute ?? node.position ?? { x: 0, y: 0 };
-  const width = node.measured?.width ?? node.width ?? 320;
-  const height = node.measured?.height ?? node.height ?? 190;
-  return {
-    x: position.x,
-    y: position.y,
-    width,
-    height,
-    centerX: position.x + width / 2,
-    centerY: position.y + height / 2
-  };
-}
-
-function nodeIntersection(fromNode: FloatingNodeBox, toNode: FloatingNodeBox) {
-  const from = nodeBox(fromNode);
-  const to = nodeBox(toNode);
-  const dx = to.centerX - from.centerX;
-  const dy = to.centerY - from.centerY;
-  const halfWidth = from.width / 2;
-  const halfHeight = from.height / 2;
-  const scale = 1 / (Math.abs(dx) / halfWidth + Math.abs(dy) / halfHeight || 1);
-
-  return {
-    x: from.centerX + dx * scale,
-    y: from.centerY + dy * scale,
-    centerX: from.centerX,
-    centerY: from.centerY
-  };
-}
-
-function edgePosition(point: { x: number; y: number; centerX: number; centerY: number }) {
-  const dx = point.x - point.centerX;
-  const dy = point.y - point.centerY;
-
-  if (Math.abs(dx) > Math.abs(dy)) {
-    return dx > 0 ? Position.Right : Position.Left;
+function routedHandles(source?: SkillNode, target?: SkillNode) {
+  if (!source || !target) {
+    return { sourceHandle: "source-right", targetHandle: "target-left" };
   }
 
-  return dy > 0 ? Position.Bottom : Position.Top;
+  const sourceCenter = { x: source.position.x + 160, y: source.position.y + 120 };
+  const targetCenter = { x: target.position.x + 160, y: target.position.y + 120 };
+  const dx = targetCenter.x - sourceCenter.x;
+  const dy = targetCenter.y - sourceCenter.y;
+
+  if (Math.abs(dy) > Math.abs(dx) * 0.75) {
+    return dy > 0
+      ? { sourceHandle: "source-bottom", targetHandle: "target-top" }
+      : { sourceHandle: "source-top", targetHandle: "target-bottom" };
+  }
+
+  return dx >= 0
+    ? { sourceHandle: "source-right", targetHandle: "target-left" }
+    : { sourceHandle: "source-left", targetHandle: "target-right" };
 }
-
-function FloatingEdge({ id, source, target, markerEnd, style, animated }: EdgeProps) {
-  const sourceNode = useInternalNode(source);
-  const targetNode = useInternalNode(target);
-
-  if (!sourceNode || !targetNode) return null;
-
-  const sourcePoint = nodeIntersection(sourceNode, targetNode);
-  const targetPoint = nodeIntersection(targetNode, sourceNode);
-  const [path] = getBezierPath({
-    sourceX: sourcePoint.x,
-    sourceY: sourcePoint.y,
-    sourcePosition: edgePosition(sourcePoint),
-    targetX: targetPoint.x,
-    targetY: targetPoint.y,
-    targetPosition: edgePosition(targetPoint),
-    curvature: 0.28
-  });
-
-  return (
-    <>
-      <BaseEdge id={id} path={path} markerEnd={markerEnd} style={style} />
-      {animated && (
-        <path
-          d={path}
-          fill="none"
-          className="foundry-floating-edge-active"
-          style={{
-            stroke: style?.stroke ?? "#5B21B6",
-            strokeWidth: Number(style?.strokeWidth ?? 3) + 1,
-            strokeDasharray: "7 8",
-            pointerEvents: "none"
-          }}
-        />
-      )}
-    </>
-  );
-}
-
-const nodeTypes = { skill: SkillCard };
-const edgeTypes = { floating: FloatingEdge };
 
 export default function FoundryDashboard() {
   const router = useRouter();
@@ -781,9 +714,14 @@ export default function FoundryDashboard() {
     () =>
       edges.map((edge) => {
         const selected = edge.id === selectedEdgeId;
+        const handles = routedHandles(
+          nodes.find((node) => node.id === edge.source),
+          nodes.find((node) => node.id === edge.target)
+        );
         return {
           ...edge,
-          type: "floating",
+          ...handles,
+          type: "bezier",
           animated: selected,
           markerEnd: { type: MarkerType.ArrowClosed, color: selected ? "#5B21B6" : "#8127cf" },
           style: {
@@ -794,7 +732,7 @@ export default function FoundryDashboard() {
           }
         };
       }),
-    [edges, selectedEdgeId]
+    [edges, nodes, selectedEdgeId]
   );
   const progress = nodes.length ? Math.round((nodes.filter((node) => node.data.status === "completed").length / nodes.length) * 100) : 0;
   const roadmapProgress = useCallback((roadmap: Roadmap) => {
@@ -870,7 +808,7 @@ export default function FoundryDashboard() {
   const onConnect = useCallback(
     (connection: Connection) => {
       setEdges((items) => {
-        const next = addEdge({ ...connection, type: "floating", animated: false, markerEnd: { type: MarkerType.ArrowClosed, color: "#7C3AED" }, style: { stroke: "#7C3AED", strokeWidth: 2.25 } }, items);
+        const next = addEdge({ ...connection, type: "bezier", animated: false, markerEnd: { type: MarkerType.ArrowClosed, color: "#7C3AED" }, style: { stroke: "#7C3AED", strokeWidth: 2.25 } }, items);
         setNodes((nodeItems) => applyLocks(nodeItems, next));
         return next;
       });
@@ -1512,7 +1450,6 @@ export default function FoundryDashboard() {
               nodes={nodes}
               edges={visibleEdges}
               nodeTypes={nodeTypes}
-              edgeTypes={edgeTypes}
               onNodesChange={onNodesChange}
               onEdgesChange={onEdgesChange}
               onConnect={onConnect}

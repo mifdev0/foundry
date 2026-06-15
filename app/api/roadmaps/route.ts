@@ -107,10 +107,10 @@ export async function GET(request: Request) {
       id: edge.id,
       source: edge.from_node_id,
       target: edge.to_node_id,
-      type: "smoothstep",
-      animated: true,
+      type: "bezier",
+      animated: false,
       markerEnd: { type: "arrowclosed", color: "#7C3AED" },
-      style: { stroke: "#7C3AED", strokeWidth: 2, strokeDasharray: "8 8" }
+      style: { stroke: "#7C3AED", strokeWidth: 2.25 }
     }))
   }));
 

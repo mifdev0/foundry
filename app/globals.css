@@ -104,12 +104,19 @@
   display: none;
 }
 
-.foundry-flow .react-flow__handle {
+.foundry-flow .foundry-node-handle {
   width: 12px;
   height: 12px;
   border: 3px solid #fff;
   background: #8127cf;
   box-shadow: 0 0 0 1px #8127cf;
+  opacity: 0.55;
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.foundry-flow .react-flow__node:hover .foundry-node-handle {
+  opacity: 1;
+  transform: scale(1.08);
 }
 
 .foundry-flow .react-flow__edge-path {
@@ -118,10 +125,11 @@
   opacity: 0.62;
 }
 
-.foundry-flow .foundry-floating-edge-active {
+.foundry-flow .react-flow__edge.animated .react-flow__edge-path {
   animation: foundry-edge-dash 900ms linear infinite;
   opacity: 0.72;
   stroke-linecap: round;
+  stroke-dasharray: 7 8;
 }
 
 @keyframes foundry-edge-dash {
