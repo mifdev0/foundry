@@ -86,7 +86,7 @@ export default function RegisterPage() {
   if (registered) {
     return (
       <main className="dot-grid flex min-h-screen items-center justify-center bg-background p-6">
-        <section className="w-full max-w-md rounded-2xl border border-outline-variant bg-white p-8 shadow-ambient text-center">
+        <section className="w-full max-w-md rounded-2xl border border-outline-variant bg-white p-5 sm:p-8 shadow-ambient text-center">
           <div className="mb-6 flex justify-center">
             <BrandLogo size={44} />
           </div>
@@ -111,11 +111,11 @@ export default function RegisterPage() {
 
   return (
     <main className="dot-grid flex min-h-screen items-center justify-center bg-background p-6">
-      <section className="w-full max-w-xl rounded-2xl border border-outline-variant bg-white p-8 shadow-ambient">
+      <section className="w-full max-w-xl rounded-2xl border border-outline-variant bg-white p-5 sm:p-8 shadow-ambient">
         <div className="mb-8 flex items-center gap-3">
           <BrandLogo size={44} />
           <div>
-            <h1 className="text-2xl font-bold text-on-surface">Buat Foundry Account</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-on-surface">Buat Foundry Account</h1>
             <p className="text-sm text-on-variant">Profil MVP untuk mulai menyusun roadmap.</p>
           </div>
         </div>

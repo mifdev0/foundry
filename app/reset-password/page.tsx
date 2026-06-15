@@ -39,7 +39,7 @@ export default function ResetPasswordPage() {
 
   return (
     <main className="dot-grid flex min-h-screen items-center justify-center bg-background p-6">
-      <section className="w-full max-w-md rounded-2xl border border-outline-variant bg-white p-8 shadow-ambient">
+      <section className="w-full max-w-md rounded-2xl border border-outline-variant bg-white p-5 sm:p-8 shadow-ambient">
         <div className="mb-8 flex items-center gap-3">
           <BrandLogo size={44} />
           <div>

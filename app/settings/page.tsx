@@ -138,21 +138,21 @@ export default function SettingsPage() {
   };
 
   return (
-    <main className="min-h-screen bg-background p-6">
+    <main className="min-h-screen bg-background p-4 sm:p-6">
       <section className="mx-auto max-w-3xl">
         <Link href="/dashboard" className="mb-6 inline-flex items-center gap-2 text-sm font-semibold text-primary">
           <ArrowLeft size={17} /> Kembali ke dashboard
         </Link>
-        <div className="rounded-2xl border border-outline-variant bg-white p-8 shadow-ambient">
+        <div className="rounded-2xl border border-outline-variant bg-white p-5 sm:p-8 shadow-ambient">
           <div className="flex items-center gap-3">
             <BrandLogo size={44} />
             <div>
-              <h1 className="text-2xl font-bold">Settings</h1>
+              <h1 className="text-xl sm:text-2xl font-bold">Settings</h1>
               <p className="mt-1 text-sm text-on-variant">Kelola profil akun dan avatar Foundry.</p>
             </div>
           </div>
 
-          <div className="mt-8 flex flex-wrap items-center gap-4 border-b border-outline-variant pb-6">
+          <div className="mt-6 sm:mt-8 flex flex-wrap items-center gap-3 sm:gap-4 border-b border-outline-variant pb-6">
             {avatar ? <img src={avatar} alt="Avatar profil" className="h-20 w-20 rounded-full object-cover" /> : <Avatar size={80} />}
             <input ref={fileRef} onChange={uploadAvatar} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" />
             <button onClick={() => fileRef.current?.click()} disabled={uploading} className="inline-flex items-center gap-2 rounded-lg border border-outline-variant px-3 py-2 text-sm font-semibold text-on-surface disabled:cursor-not-allowed disabled:bg-slate-100">

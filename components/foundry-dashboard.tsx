@@ -551,6 +551,7 @@ export default function FoundryDashboard() {
   const [edges, setEdges] = useEdgesState<Edge>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [tab, setTab] = useState<Tab>("overview");
   const [roadmapModalOpen, setRoadmapModalOpen] = useState(false);
   const [roadmapTitle, setRoadmapTitle] = useState("");
@@ -763,6 +764,7 @@ export default function FoundryDashboard() {
     setEdges(normalized.edges);
     setSelectedNodeId(null);
     setSelectedEdgeId(null);
+    setSidebarOpen(false);
   };
 
   const addRoadmap = () => {
@@ -1207,7 +1209,7 @@ export default function FoundryDashboard() {
 
   return (
     <main className="flex h-screen overflow-hidden bg-background text-on-surface">
-      <aside className="z-20 flex w-72 shrink-0 flex-col border-r border-outline-variant bg-white/90 px-3 py-5 backdrop-blur">
+      <aside className={clsx("z-20 flex w-72 shrink-0 flex-col border-r border-outline-variant bg-white/90 px-3 py-5 backdrop-blur fixed inset-y-0 left-0 transition-transform duration-300 lg:relative lg:translate-x-0", sidebarOpen ? "translate-x-0" : "-translate-x-full")}>
         <div className="mb-7 px-3">
           <div className="flex items-center gap-3">
             <BrandLogo size={44} className="shadow-lg shadow-primary-container/20" />
@@ -1280,25 +1282,32 @@ export default function FoundryDashboard() {
         </div>
       </aside>
 
+      {sidebarOpen && <div className="fixed inset-0 z-10 bg-black/30 lg:hidden" onClick={() => setSidebarOpen(false)} />}
+
       <section className="relative flex min-w-0 flex-1 flex-col">
         <div className="absolute inset-0 dot-grid opacity-80" />
-        <header className="z-10 flex items-center justify-between border-b border-outline-variant bg-white/75 px-6 py-4 backdrop-blur">
-          <div>
-            <h2 className="text-xl font-bold">{activeRoadmap?.title ?? "Foundry Canvas"}</h2>
-            <p className="text-sm text-on-variant">
-              {activeRoadmap ? `${progress}% progress. Dependency-aware canvas dengan Forge Test gateway.` : "Pilih atau buat roadmap untuk mulai menyusun learning path."}
-            </p>
+        <header className="z-10 flex items-center justify-between border-b border-outline-variant bg-white/75 px-4 py-3 sm:px-6 sm:py-4 backdrop-blur">
+          <div className="flex items-center gap-3 min-w-0">
+            <button onClick={() => setSidebarOpen(!sidebarOpen)} className="rounded-lg p-2 hover:bg-surface-low lg:hidden">
+              <LayoutGrid size={20} />
+            </button>
+            <div className="min-w-0">
+              <h2 className="text-lg sm:text-xl font-bold truncate">{activeRoadmap?.title ?? "Foundry Canvas"}</h2>
+              <p className="text-xs sm:text-sm text-on-variant truncate">
+                {activeRoadmap ? `${progress}% progress. Dependency-aware canvas dengan Forge Test gateway.` : "Pilih atau buat roadmap untuk mulai menyusun learning path."}
+              </p>
+            </div>
           </div>
           {activeRoadmap && (
-            <div className="flex items-center gap-2">
-              <button onClick={() => setNodeModalOpen(true)} className="inline-flex items-center gap-2 rounded-lg border border-outline-variant bg-white px-3 py-2 text-sm font-semibold hover:border-primary-container">
-                <Plus size={17} /> Add Node
+            <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+              <button onClick={() => setNodeModalOpen(true)} className="inline-flex items-center gap-1.5 rounded-lg border border-outline-variant bg-white px-2 py-1.5 text-xs sm:px-3 sm:py-2 sm:text-sm font-semibold hover:border-primary-container">
+                <Plus size={15} className="sm:hidden" /><Plus size={17} className="hidden sm:block" /> <span className="hidden sm:inline">Add Node</span>
               </button>
-              <button onClick={() => setDraftOpen(true)} className="inline-flex items-center gap-2 rounded-lg border border-outline-variant bg-white px-3 py-2 text-sm font-semibold hover:border-primary-container">
-                <Sparkles size={17} /> AI Generate
+              <button onClick={() => setDraftOpen(true)} className="inline-flex items-center gap-1.5 rounded-lg border border-outline-variant bg-white px-2 py-1.5 text-xs sm:px-3 sm:py-2 sm:text-sm font-semibold hover:border-primary-container">
+                <Sparkles size={15} className="sm:hidden" /><Sparkles size={17} className="hidden sm:block" /> <span className="hidden sm:inline">AI Generate</span>
               </button>
-              <button onClick={autoLayout} className="inline-flex items-center gap-2 rounded-lg bg-primary-container px-3 py-2 text-sm font-bold text-white">
-                <LayoutGrid size={17} /> Auto Layout
+              <button onClick={autoLayout} className="inline-flex items-center gap-1.5 rounded-lg bg-primary-container px-2 py-1.5 text-xs sm:px-3 sm:py-2 sm:text-sm font-bold text-white">
+                <LayoutGrid size={15} className="sm:hidden" /><LayoutGrid size={17} className="hidden sm:block" /> <span className="hidden sm:inline">Auto Layout</span>
               </button>
             </div>
           )}
@@ -1333,10 +1342,12 @@ export default function FoundryDashboard() {
               setSelectedNodeId(node.id);
               setSelectedEdgeId(null);
               setTab("overview");
+              setSidebarOpen(false);
             }}
             onEdgeClick={(_, edge) => {
               setSelectedEdgeId(edge.id);
               setSelectedNodeId(null);
+              setSidebarOpen(false);
             }}
             fitView
           >
@@ -1348,7 +1359,7 @@ export default function FoundryDashboard() {
       </section>
 
       {selectedNode && (
-        <aside className="z-30 flex w-[420px] shrink-0 flex-col border-l border-outline-variant bg-white shadow-ambient">
+        <aside className="z-30 flex w-full sm:w-[420px] shrink-0 flex-col border-l border-outline-variant bg-white shadow-ambient fixed inset-y-0 right-0 sm:relative">
           <div className="flex items-start justify-between border-b border-outline-variant p-5">
             <div>
               <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.08em] text-primary">
@@ -1544,7 +1555,7 @@ export default function FoundryDashboard() {
       )}
 
       {selectedEdgeId && !selectedNode && (
-        <aside className="z-30 flex w-[420px] shrink-0 flex-col border-l border-outline-variant bg-white shadow-ambient">
+        <aside className="z-30 flex w-full sm:w-[420px] shrink-0 flex-col border-l border-outline-variant bg-white shadow-ambient fixed inset-y-0 right-0 sm:relative">
           <div className="flex items-start justify-between border-b border-outline-variant p-5">
             <div>
               <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.08em] text-primary">
