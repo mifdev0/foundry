@@ -219,6 +219,51 @@ export async function PUT(request: Request) {
   return NextResponse.json({ ok: true });
 }
 
+export async function PATCH(request: Request) {
+  const { supabase, user, error: authError } = await getAuthenticatedUser(request);
+
+  if (!supabase) {
+    return NextResponse.json({ ok: false, error: "Supabase env belum terisi" }, { status: 503 });
+  }
+
+  if (!user) {
+    return NextResponse.json({ ok: false, error: authError }, { status: 401 });
+  }
+
+  const { id, title, description } = (await request.json()) as { id?: string; title?: string; description?: string };
+
+  if (!id || !title?.trim()) {
+    return NextResponse.json({ ok: false, error: "Roadmap id dan title wajib diisi" }, { status: 400 });
+  }
+
+  const patch: { title: string; updated_at: string; description?: string } = {
+    title: title.trim(),
+    updated_at: new Date().toISOString()
+  };
+
+  if (typeof description === "string") {
+    patch.description = description;
+  }
+
+  const { data, error } = await supabase
+    .from("roadmaps")
+    .update(patch)
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    return NextResponse.json({ ok: false, error: error.message }, { status: 503 });
+  }
+
+  if (!data) {
+    return NextResponse.json({ ok: false, error: "Roadmap tidak ditemukan" }, { status: 404 });
+  }
+
+  return NextResponse.json({ ok: true });
+}
+
 export async function DELETE(request: Request) {
   const { supabase, user, error: authError } = await getAuthenticatedUser(request);
 
@@ -235,6 +280,31 @@ export async function DELETE(request: Request) {
 
   if (!id) {
     return NextResponse.json({ ok: false, error: "Roadmap id wajib diisi" }, { status: 400 });
+  }
+
+  const { data: ownedRoadmap, error: lookupError } = await supabase
+    .from("roadmaps")
+    .select("id")
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (lookupError) {
+    return NextResponse.json({ ok: false, error: lookupError.message }, { status: 503 });
+  }
+
+  if (!ownedRoadmap) {
+    return NextResponse.json({ ok: false, error: "Roadmap tidak ditemukan" }, { status: 404 });
+  }
+
+  const tables = ["tasks", "node_dependencies", "nodes"] as const;
+
+  for (const table of tables) {
+    const { error: childError } = await supabase.from(table).delete().eq("roadmap_id", id);
+
+    if (childError) {
+      return NextResponse.json({ ok: false, error: childError.message }, { status: 503 });
+    }
   }
 
   const { error } = await supabase.from("roadmaps").delete().eq("id", id).eq("user_id", user.id);

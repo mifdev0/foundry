@@ -868,6 +868,11 @@ export default function FoundryDashboard() {
   const deleteRoadmap = () => {
     if (!deleteRoadmapId) return;
 
+    const idToDelete = deleteRoadmapId;
+    const previousRoadmaps = roadmaps;
+    const previousActiveId = activeId;
+    const previousNodes = nodes;
+    const previousEdges = edges;
     const finalRoadmaps = roadmaps.filter((roadmap) => roadmap.id !== deleteRoadmapId);
     const nextActiveRaw = activeId === deleteRoadmapId ? finalRoadmaps[0] : roadmaps.find((roadmap) => roadmap.id === activeId) ?? finalRoadmaps[0];
     const nextActive = nextActiveRaw ? normalizeRoadmap(nextActiveRaw) : undefined;
@@ -879,7 +884,19 @@ export default function FoundryDashboard() {
     setSelectedNodeId(null);
     setSelectedEdgeId(null);
     window.localStorage.setItem(scopedKey(currentUserId, "roadmaps"), JSON.stringify(finalRoadmaps));
-    void getAuthHeaders().then((headers) => fetch(`/api/roadmaps?id=${encodeURIComponent(deleteRoadmapId)}`, { method: "DELETE", headers })).catch(() => undefined);
+    void getAuthHeaders()
+      .then(async (headers) => {
+        const response = await fetch(`/api/roadmaps?id=${encodeURIComponent(idToDelete)}`, { method: "DELETE", headers });
+        if (!response.ok) throw new Error("Delete roadmap gagal");
+      })
+      .catch((error) => {
+        console.error(error);
+        setRoadmaps(previousRoadmaps);
+        setActiveId(previousActiveId);
+        setNodes(previousNodes);
+        setEdges(previousEdges);
+        window.localStorage.setItem(scopedKey(currentUserId, "roadmaps"), JSON.stringify(previousRoadmaps));
+      });
 
     setDeleteRoadmapId(null);
   };
@@ -894,18 +911,26 @@ export default function FoundryDashboard() {
       setRenameRoadmapId(null);
       return;
     }
-    const updated = roadmaps.map((r) => r.id === renameRoadmapId ? { ...r, title: renameRoadmapTitle.trim(), updatedAt: new Date().toISOString() } : r);
+    const idToRename = renameRoadmapId;
+    const title = renameRoadmapTitle.trim();
+    const previousRoadmaps = roadmaps;
+    const updated = roadmaps.map((r) => r.id === idToRename ? { ...r, title, updatedAt: new Date().toISOString() } : r);
     setRoadmaps(updated);
     window.localStorage.setItem(scopedKey(currentUserId, "roadmaps"), JSON.stringify(updated));
     void getAuthHeaders()
-      .then((headers) =>
-        fetch("/api/roadmaps", {
-          method: "PUT",
+      .then(async (headers) => {
+        const response = await fetch("/api/roadmaps", {
+          method: "PATCH",
           headers: { "Content-Type": "application/json", ...headers },
-          body: JSON.stringify({ roadmaps: updated })
-        })
-      )
-      .catch(() => undefined);
+          body: JSON.stringify({ id: idToRename, title })
+        });
+        if (!response.ok) throw new Error("Rename roadmap gagal");
+      })
+      .catch((error) => {
+        console.error(error);
+        setRoadmaps(previousRoadmaps);
+        window.localStorage.setItem(scopedKey(currentUserId, "roadmaps"), JSON.stringify(previousRoadmaps));
+      });
     setRenameRoadmapId(null);
     setRenameRoadmapTitle("");
   };
