@@ -3,24 +3,93 @@
 @tailwind components;
 @tailwind utilities;
 
-* {
-  box-sizing: border-box;
+@layer base {
+  body {
+    @apply min-h-screen bg-background text-on-surface font-sans;
+  }
 }
 
-html,
-body {
-  height: 100%;
+@layer components {
+  .dreamy-gradient {
+    background: radial-gradient(circle at 20% 30%, #f0dbff 0%, transparent 40%),
+                radial-gradient(circle at 80% 70%, #ecdcff 0%, transparent 40%),
+                radial-gradient(circle at 50% 50%, #fef7fd 0%, transparent 100%);
+  }
+
+  .foundry-canvas-bg {
+    background:
+      radial-gradient(circle at 15% 20%, rgba(240, 219, 255, 0.95) 0%, transparent 35%),
+      radial-gradient(circle at 86% 72%, rgba(236, 220, 255, 0.9) 0%, transparent 36%),
+      radial-gradient(circle at 48% 90%, rgba(255, 220, 193, 0.55) 0%, transparent 34%),
+      #fef7fd;
+  }
+
+  .dot-grid {
+    background-image: radial-gradient(#cbc4cf 0.5px, transparent 0.5px);
+    background-size: 24px 24px;
+  }
+
+  .canvas-grid {
+    background-image:
+      linear-gradient(to right, rgba(129, 39, 207, 0.055) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(129, 39, 207, 0.055) 1px, transparent 1px);
+    background-size: 80px 80px;
+  }
+
+  .glass-card {
+    @apply bg-white/60 backdrop-blur-md border border-white/40 shadow-ambient transition-all duration-300;
+  }
+
+  .glass-card:hover {
+    @apply -translate-y-1 shadow-secondary-glow border-secondary/20;
+  }
+
+  .node-accent {
+    @apply h-1 w-full rounded-t-lg absolute top-0 left-0;
+  }
+
+  .float-hashtag {
+    @apply font-bold text-xs uppercase tracking-widest text-on-surface-variant/20 animate-float;
+  }
+
+  .foundry-glass {
+    @apply border border-white/60 bg-white/70 shadow-ambient backdrop-blur-2xl;
+  }
+
+  .foundry-pill {
+    @apply rounded-full border border-white/60 bg-white/70 shadow-ambient backdrop-blur-2xl;
+  }
+
+  .foundry-action {
+    @apply inline-flex items-center justify-center gap-2 rounded-full bg-black px-4 py-2 text-xs font-extrabold text-white shadow-secondary-glow transition hover:scale-[1.03] active:scale-95 disabled:cursor-not-allowed disabled:bg-surface-dim disabled:text-on-surface-variant disabled:shadow-none;
+  }
+
+  .foundry-ghost-action {
+    @apply inline-flex items-center justify-center gap-2 rounded-full border border-outline-variant/70 bg-white/70 px-3 py-2 text-xs font-bold text-on-surface transition hover:border-secondary/40 hover:bg-white;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(129, 39, 207, 0.18);
+    border-radius: 999px;
+  }
 }
 
-body {
-  margin: 0;
-  background: #f8f7ff;
-  color: #131b2e;
+@keyframes float {
+  0%, 100% { transform: translateY(0) rotate(0); }
+  50% { transform: translateY(-15px) rotate(2deg); }
 }
 
-.dot-grid {
-  background-image: radial-gradient(#ccc3d8 1px, transparent 1px);
-  background-size: 24px 24px;
+.animate-float {
+  animation: float 6s ease-in-out infinite;
 }
 
 .foundry-flow .react-flow__pane {
@@ -36,14 +105,41 @@ body {
 }
 
 .foundry-flow .react-flow__handle {
-  width: 10px;
-  height: 10px;
-  border: 2px solid #fff;
-  background: #7c3aed;
+  width: 12px;
+  height: 12px;
+  border: 3px solid #fff;
+  background: #8127cf;
+  box-shadow: 0 0 0 1px #8127cf;
 }
 
 .foundry-flow .react-flow__edge-path {
   stroke-linecap: round;
+  stroke-width: 2.5;
+  stroke-dasharray: 8 8;
+  opacity: 0.58;
+}
+
+.foundry-flow .react-flow__controls {
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.65);
+  border-radius: 24px;
+  background: rgba(255,255,255,.72);
+  box-shadow: 0 10px 30px rgba(29, 16, 65, .08);
+  backdrop-filter: blur(20px);
+}
+
+.foundry-flow .react-flow__controls-button {
+  border-bottom: 1px solid rgba(203,196,207,.55);
+  background: transparent;
+}
+
+.foundry-flow .react-flow__minimap {
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.7);
+  border-radius: 22px;
+  background: rgba(255,255,255,.68);
+  box-shadow: 0 10px 30px rgba(29, 16, 65, .08);
+  backdrop-filter: blur(20px);
 }
 
 .content-editable:empty::before {

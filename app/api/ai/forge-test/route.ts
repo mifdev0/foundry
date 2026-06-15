@@ -58,10 +58,6 @@ function fallbackCase(nodes: ForgeNode[] = [], targetNode?: ForgeNode): CaseStud
   };
 }
 
-function hasCustomHook(text: string, topic?: string) {
-  const hasHookName = /\bfunction\s+use[A-Z][A-Za-z0-9_]*\b/.test(text) || /\bconst\s+use[A-Z][A-Za-z0-9_]*\s*=/.test(text);
-  return topic ? hasHookName && text.includes(topic) : hasHookName;
-}
 
 function checkRequirement(requirement: string, submission: string): RequirementCheck {
   const req = requirement.toLowerCase();
@@ -75,49 +71,15 @@ function checkRequirement(requirement: string, submission: string): RequirementC
     };
   }
 
-  const isCodingReq = req.includes("route") || req.includes("routing") || req.includes("state") || req.includes("hook") || req.includes("useeffect") || req.includes("array") || req.includes("object") || req.includes("loop") || req.includes("function") || req.includes("fungsi");
-  const isCodingSubmission = text.includes("const ") || text.includes("let ") || text.includes("function") || text.includes("=>") || text.includes("{") || text.includes(";");
-
-  let met = false;
-  if (isCodingReq && isCodingSubmission) {
-    if (req.includes("react router") || req.includes("perpindahan antar halaman") || req.includes("routing")) {
-      met = /browserrouter|createbrowserrouter|routes|route|link|usenavigate|navigate\(/i.test(submission);
-    } else if (req.includes("state management") || req.includes("data pengguna") || req.includes("user")) {
-      const hasStateTool = /usestate|usereducer|createcontext|usecontext|redux|zustand|provider|dispatch|set[A-Z]/.test(text);
-      const hasUserData = /user|username|email|password|auth|login/.test(text);
-      met = hasStateTool && hasUserData;
-    } else if (req.includes("custom hook") || req.includes("custom hooks")) {
-      met = hasCustomHook(submission, req.includes("tema") || req.includes("theme") ? "theme" : undefined);
-    } else if (req.includes("tema") || req.includes("theme")) {
-      met = /theme|dark|light|toggletheme|settheme|usetheme/i.test(submission);
-    } else if (req.includes("login")) {
-      met = /username|email|password|login/i.test(submission);
-    } else if (req.includes("tambah") && req.includes("todo")) {
-      met = /addtodo|settodos|push|concat|\[\s*\.\.\.todos/i.test(submission);
-    } else if (req.includes("useeffect")) {
-      met = /useeffect\s*\(/i.test(submission);
-    } else if (req.includes("array")) {
-      met = /\[[\s\S]*\]/.test(submission) || /\.map\(|\.filter\(|\.reduce\(/i.test(submission);
-    } else if (req.includes("object")) {
-      met = /\{[\s\S]*:[\s\S]*\}/.test(submission);
-    } else if (req.includes("function") || req.includes("fungsi")) {
-      met = /function\s+\w+|\([^)]*\)\s*=>|const\s+\w+\s*=\s*\([^)]*\)\s*=>/i.test(submission);
-    } else if (req.includes("conditional") || req.includes("if") || req.includes("kondisi")) {
-      met = /\bif\s*\(|\?|switch\s*\(/i.test(submission);
-    } else if (req.includes("loop")) {
-      met = /\bfor\s*\(|\bwhile\s*\(|\.map\(|\.forEach\(|\.reduce\(/i.test(submission);
-    } else {
-      const words = req
-        .split(/[^a-z0-9]+/i)
-        .filter((word) => word.length > 4 && !["menggunakan", "dengan", "untuk", "aplikasi", "secara", "benar"].includes(word));
-      met = words.length === 0 || words.some((word) => text.includes(word));
-    }
-  } else {
-    const words = req
-      .split(/[^a-z0-9]+/i)
-      .filter((word) => word.length > 4 && !["menggunakan", "dengan", "untuk", "tugas", "studi", "kasus", "materi", "secara", "benar"].includes(word));
-    met = words.length === 0 || words.some((word) => text.includes(word)) || text.length > 40;
-  }
+  // General keyword matching for any topic
+  // Filters out common Indonesian filler words to get core concepts
+  const words = req
+    .split(/[^a-z0-9]+/i)
+    .filter((word) => word.length > 3 && !["menggunakan", "dengan", "untuk", "tugas", "studi", "kasus", "materi", "secara", "benar", "sebagai", "dalam", "yang"].includes(word));
+  
+  // If we have specific keywords, check if at least some of them appear in the submission
+  // This is a rough heuristic for the fallback, AI does the heavy lifting
+  const met = words.length === 0 || words.some((word) => text.includes(word)) || text.length > 100;
 
   return {
     label: requirement,
@@ -132,7 +94,6 @@ function auditSubmission(submission: string, caseStudy?: CaseStudy) {
   const text = submission.toLowerCase();
   const selfDeclaredIncomplete =
     /belum ada|belum dibuat|tidak ada|cuma fokus|hanya fokus|belum selesai/i.test(text);
-  const missingCount = missingRequirements.length + (selfDeclaredIncomplete ? 1 : 0);
   const scoreCap = selfDeclaredIncomplete ? 65 : 100;
 
   return {
@@ -169,7 +130,7 @@ function enforceAudit(evaluation: Evaluation, submission: string, caseStudy?: Ca
   };
 }
 
-function fallbackEvaluation(submission: string, nodes: ForgeNode[] = [], caseStudy?: CaseStudy): Evaluation {
+function fallbackEvaluation(submission: string, caseStudy?: CaseStudy): Evaluation {
   const text = submission.trim();
   const wordCount = text.split(/\s+/).filter(Boolean).length;
   const tooShort = wordCount < 10;
@@ -201,11 +162,11 @@ export async function POST(request: Request) {
   const groq = getGroqClient();
   if (body.mode === "evaluate") {
     if (!body.submission?.trim()) {
-      return NextResponse.json({ evaluation: fallbackEvaluation("", body.targetNode ? [...nodes, body.targetNode] : nodes, body.caseStudy) });
+      return NextResponse.json({ evaluation: fallbackEvaluation("", body.caseStudy) });
     }
 
     if (!groq) {
-      return NextResponse.json({ evaluation: fallbackEvaluation(body.submission, body.targetNode ? [...nodes, body.targetNode] : nodes, body.caseStudy) });
+      return NextResponse.json({ evaluation: fallbackEvaluation(body.submission, body.caseStudy) });
     }
 
     const completion = await groq.chat.completions.create({
@@ -243,7 +204,7 @@ export async function POST(request: Request) {
         evaluation
       });
     } catch {
-      return NextResponse.json({ evaluation: fallbackEvaluation(body.submission, body.targetNode ? [...nodes, body.targetNode] : nodes, body.caseStudy), raw: text });
+      return NextResponse.json({ evaluation: fallbackEvaluation(body.submission, body.caseStudy), raw: text });
     }
   }
 

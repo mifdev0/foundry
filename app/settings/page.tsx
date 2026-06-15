@@ -2,12 +2,15 @@
 
 import { ChangeEvent, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import Avatar from "@/components/avatar";
 import BrandLogo from "@/components/brand-logo";
-import { ArrowLeft, Camera, KeyRound, Save, Trash2 } from "lucide-react";
+import { ArrowLeft, Camera, KeyRound, LogOut, Save, Trash2 } from "lucide-react";
 import { getAuthHeaders, getCurrentUserId, scopedKey } from "@/lib/auth-client";
+import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 
 export default function SettingsPage() {
+  const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const [fullName, setFullName] = useState("");
   const [username, setUsername] = useState("");
@@ -137,6 +140,13 @@ export default function SettingsPage() {
     }
   };
 
+  const logout = async () => {
+    const supabase = getSupabaseBrowserClient();
+    if (supabase) await supabase.auth.signOut();
+    window.localStorage.removeItem("foundry-active-user-id");
+    router.push("/login");
+  };
+
   return (
     <main className="min-h-screen bg-background p-4 sm:p-6">
       <section className="mx-auto max-w-3xl">
@@ -189,6 +199,9 @@ export default function SettingsPage() {
               <Save size={17} /> {saving ? "Menyimpan..." : "Simpan profil"}
             </button>
           </form>
+          <button onClick={() => void logout()} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-600">
+            <LogOut size={17} /> Logout
+          </button>
           {status && <div className="mt-4 rounded-lg border border-outline-variant bg-surface-low px-3 py-2 text-sm text-on-variant">{status}</div>}
         </div>
       </section>

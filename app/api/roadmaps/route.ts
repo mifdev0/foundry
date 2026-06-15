@@ -25,6 +25,35 @@ type RoadmapPayload = {
   edges: Array<{ id: string; source: string; target: string }>;
 };
 
+type DbTask = {
+  id: string;
+  title: string;
+  completed: boolean;
+  due_date?: string | null;
+};
+
+type DbNode = {
+  id: string;
+  position_x: number;
+  position_y: number;
+  title: string;
+  description?: string | null;
+  status: string;
+  notes?: string | null;
+  order_index: number;
+  forge_passed?: boolean | null;
+  forge_feedback?: string | null;
+  cooldown_until?: string | null;
+  messages_json?: Array<{ id: string; role: string; content: string }> | null;
+  tasks?: DbTask[] | null;
+};
+
+type DbDependency = {
+  id: string;
+  from_node_id: string;
+  to_node_id: string;
+};
+
 export async function GET(request: Request) {
   const { supabase, user, error: authError } = await getAuthenticatedUser(request);
 
@@ -51,7 +80,7 @@ export async function GET(request: Request) {
     title: roadmap.title,
     description: roadmap.description ?? "",
     updatedAt: roadmap.updated_at,
-    nodes: (roadmap.nodes ?? []).map((node: any) => ({
+    nodes: ((roadmap.nodes ?? []) as DbNode[]).map((node) => ({
       id: node.id,
       type: "skill",
       position: { x: node.position_x, y: node.position_y },
@@ -66,7 +95,7 @@ export async function GET(request: Request) {
         feedback: node.forge_feedback ?? undefined,
         cooldownUntil: node.cooldown_until ? new Date(node.cooldown_until).getTime() : undefined,
         messages: node.messages_json ?? [],
-        tasks: (node.tasks ?? []).map((task: any) => ({
+        tasks: (node.tasks ?? []).map((task) => ({
           id: task.id,
           title: task.title,
           completed: task.completed,
@@ -74,7 +103,7 @@ export async function GET(request: Request) {
         }))
       }
     })),
-    edges: (roadmap.node_dependencies ?? []).map((edge: any) => ({
+    edges: ((roadmap.node_dependencies ?? []) as DbDependency[]).map((edge) => ({
       id: edge.id,
       source: edge.from_node_id,
       target: edge.to_node_id,

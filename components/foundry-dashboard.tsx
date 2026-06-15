@@ -1,8 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import Avatar from "@/components/avatar";
 import BrandLogo from "@/components/brand-logo";
 import { getAuthHeaders, getCurrentUserId, scopedKey } from "@/lib/auth-client";
@@ -28,7 +27,6 @@ import {
 import clsx from "clsx";
 import {
   AlertTriangle,
-  Bot,
   Brain,
   CalendarClock,
   CheckCircle2,
@@ -36,8 +34,6 @@ import {
   GitBranch,
   LayoutGrid,
   Lock,
-  LogOut,
-  MessageSquare,
   PanelRight,
   Pencil,
   Plus,
@@ -125,10 +121,10 @@ type Roadmap = {
 const maxTasksPerNode = 10;
 const forgeDurationMs = 24 * 60 * 60 * 1000;
 
-const statusMeta: Record<Status, { label: string; className: string; icon: typeof Circle }> = {
-  not_started: { label: "Not Started", className: "bg-slate-100 text-slate-600", icon: Circle },
-  in_progress: { label: "In Progress", className: "bg-violet-100 text-primary", icon: Brain },
-  completed: { label: "Completed", className: "bg-emerald-100 text-emerald-700", icon: CheckCircle2 }
+const statusMeta: Record<Status, { label: string; className: string; color: string; icon: typeof Circle }> = {
+  not_started: { label: "NOT STARTED", className: "bg-surface-dim/20 text-on-surface-variant", color: "#94a3b8", icon: Circle },
+  in_progress: { label: "IN PROGRESS", className: "bg-amber-100/50 text-amber-700", color: "#f59e0b", icon: Brain },
+  completed: { label: "COMPLETED", className: "bg-emerald-100/50 text-emerald-700", color: "#10b981", icon: CheckCircle2 }
 };
 
 const makeEdge = (source: string, target: string): Edge => ({
@@ -137,31 +133,18 @@ const makeEdge = (source: string, target: string): Edge => ({
   target,
   type: "smoothstep",
   animated: true,
-  markerEnd: { type: MarkerType.ArrowClosed, color: "#7C3AED" },
-  style: { stroke: "#7C3AED", strokeWidth: 2, strokeDasharray: "8 8" }
+  markerEnd: { type: MarkerType.ArrowClosed, color: "#8127cf" },
+  style: { stroke: "#8127cf", strokeWidth: 2, strokeDasharray: "8 8" }
 });
 
-function makeDefaultTasks(title: string, description = ""): TaskItem[] {
-  const normalized = `${title} ${description}`.toLowerCase();
-
-  if (normalized.includes("javascript")) {
-    return [
-      { id: crypto.randomUUID(), title: "Mengerti jenis-jenis variabel di JavaScript (var, let, const)", completed: false },
-      { id: crypto.randomUUID(), title: "Mengerti tipe data di JavaScript (string, number, boolean, null, undefined, object)", completed: false },
-      { id: crypto.randomUUID(), title: "Mengerti operator di JavaScript (aritmatika, perbandingan, logika)", completed: false },
-      { id: crypto.randomUUID(), title: "Mengerti kontrol alir di JavaScript (if/else, switch, ternary)", completed: false },
-      { id: crypto.randomUUID(), title: "Mengerti fungsi di JavaScript (declaration, expression, arrow function)", completed: false },
-      { id: crypto.randomUUID(), title: "Praktik array dan method-nya (push, map, filter, reduce)", completed: false },
-      { id: crypto.randomUUID(), title: "Praktik object dan cara akses propertinya", completed: false }
-    ];
-  }
-
+function makeDefaultTasks(title: string, _description = ""): TaskItem[] {
+  void _description;
   return [
     { id: crypto.randomUUID(), title: `Pelajari konsep inti ${title}`, completed: false },
     { id: crypto.randomUUID(), title: "Buat catatan ringkas dari materi utama", completed: false },
-    { id: crypto.randomUUID(), title: "Cari dan pelajari contoh kode/implementasi", completed: false },
-    { id: crypto.randomUUID(), title: "Selesaikan latihan kecil untuk validasi pemahaman", completed: false },
-    { id: crypto.randomUUID(), title: "Review ulang dan catat poin yang masih belum paham", completed: false }
+    { id: crypto.randomUUID(), title: "Cari dan pelajari contoh atau studi kasus", completed: false },
+    { id: crypto.randomUUID(), title: "Selesaikan latihan praktis untuk validasi", completed: false },
+    { id: crypto.randomUUID(), title: "Review ulang poin-poin yang masih membingungkan", completed: false }
   ];
 }
 
@@ -437,23 +420,6 @@ function renderMessageContent(content: string) {
   });
 }
 
-const starterRoadmap = (): Roadmap => {
-  const nodes = [
-    makeNode("n1", "Frontend Fundamentals", "HTML semantic, CSS layout, dan JavaScript runtime dasar.", 80, 120, 1, "completed"),
-    makeNode("n2", "Advanced React", "Hooks, state composition, performance, dan server components.", 470, 270, 2, "in_progress"),
-    makeNode("n3", "Backend Node.js", "HTTP, routing, database access, auth, dan API contract.", 870, 140, 3),
-    makeNode("n4", "System Design", "Scalability, availability, caching, queue, dan tradeoff arsitektur.", 870, 430, 4)
-  ];
-  return {
-    id: "roadmap-1",
-    title: "Software Architecture Mastery",
-    description: "Roadmap personal untuk menguasai topik ini secara bertahap.",
-    updatedAt: new Date().toISOString(),
-    nodes,
-    edges: [makeEdge("n1", "n2"), makeEdge("n2", "n3"), makeEdge("n2", "n4")]
-  };
-};
-
 function applyLocks(nodes: SkillNode[], edges: Edge[]) {
   return nodes.map((node) => {
     const prerequisites = edges.filter((edge) => edge.target === node.id).map((edge) => nodes.find((item) => item.id === edge.source));
@@ -462,81 +428,109 @@ function applyLocks(nodes: SkillNode[], edges: Edge[]) {
   });
 }
 
+const DeadlineNowContext = createContext(Date.now());
+
 function SkillCard({ data, selected }: NodeProps<SkillNode>) {
-  const [now, setNow] = useState(Date.now());
+  const now = useContext(DeadlineNowContext);
   const meta = statusMeta[data.status];
-  const Icon = data.locked ? Lock : meta.icon;
   const tasks = data.tasks ?? [];
+  const totalTasks = tasks.length;
   const completedTasks = tasks.filter((task) => task.completed).length;
   const nodeDone = data.status === "completed" && data.forgePassed;
+  const progressPercent = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : nodeDone ? 100 : 0;
   const urgentTasks = nodeDone ? 0 : tasks.filter((task) => taskReminder(task)?.tone === "danger").length;
   const deadline = nodeDeadlineStatus(tasks, nodeDone, now);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 60_000);
-    return () => window.clearInterval(timer);
-  }, []);
 
   return (
     <div
       className={clsx(
-        "w-80 rounded-2xl border bg-white p-5 shadow-ambient transition duration-200",
-        selected && "border-primary-container shadow-glow",
-        !selected && data.status === "completed" && "border-emerald-200",
-        !selected && data.status === "in_progress" && "border-primary-container/70 shadow-glow",
-        !selected && data.status === "not_started" && "border-outline-variant",
-        data.locked && "opacity-60 grayscale"
+        "glass-card relative w-[320px] overflow-hidden rounded-[20px] p-6 transition-all duration-300",
+        selected && "ring-2 ring-secondary ring-offset-4 ring-offset-transparent shadow-secondary-glow",
+        data.locked && "opacity-60 grayscale-[0.5]"
       )}
     >
-      <Handle type="target" position={Position.Left} />
-      <div className="mb-3 flex items-start justify-between gap-3">
-        <span className={clsx("rounded-full px-2.5 py-1 font-geist text-[10px] font-bold uppercase tracking-[0.08em]", data.locked ? "bg-slate-100 text-slate-500" : meta.className)}>
-          {data.locked ? "Locked" : meta.label}
-        </span>
-        <Icon className={clsx(data.locked ? "text-slate-500" : data.status === "completed" ? "text-emerald-600" : "text-primary")} size={20} />
-      </div>
-      <h3 className="text-lg font-bold text-on-surface">{data.title}</h3>
-      <p className="mt-2 line-clamp-3 text-sm leading-6 text-on-variant">{data.description}</p>
-      <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-surface-container">
-        <div
-          className={clsx("h-full rounded-full", data.status === "completed" ? "bg-emerald-500" : data.status === "in_progress" ? "bg-primary-container" : "bg-outline-variant")}
-          style={{ width: data.status === "completed" ? "100%" : data.status === "in_progress" ? "48%" : "0%" }}
-        />
-      </div>
-      <div className="mt-3 flex items-center justify-between font-geist text-[11px] font-semibold text-on-variant">
-        <span>{data.forgePassed ? "Forge passed" : "Forge pending"}</span>
-        <span>Order {data.orderIndex}</span>
-      </div>
-      <div className="mt-3 flex items-center justify-between rounded-lg bg-surface-low px-3 py-2 text-xs font-semibold text-on-variant">
-        <span className="inline-flex items-center gap-1">
-          <SquareCheck size={14} /> {completedTasks}/{tasks.length} tasks
-        </span>
-        {urgentTasks > 0 && (
-          <span className="inline-flex items-center gap-1 text-red-600">
-            <AlertTriangle size={14} /> {urgentTasks} due
-          </span>
-        )}
-      </div>
-      {deadline && (
-        <div
-          className={clsx(
-            "mt-2 flex items-center justify-between rounded-lg border px-3 py-2 text-xs font-semibold",
-            deadline.tone === "overdue" && "border-red-300 bg-red-100 text-red-800",
-            deadline.tone === "today" && "border-rose-300 bg-rose-50 text-rose-700",
-            deadline.tone === "h1" && "border-orange-300 bg-orange-50 text-orange-700",
-            deadline.tone === "h2" && "border-amber-300 bg-amber-50 text-amber-700",
-            deadline.tone === "h3" && "border-yellow-300 bg-yellow-50 text-yellow-700",
-            deadline.tone === "done" && "border-emerald-200 bg-emerald-50 text-emerald-700",
-            deadline.tone === "neutral" && "border-outline-variant bg-white text-on-variant"
-          )}
-        >
-          <span className="inline-flex items-center gap-1">
-            <CalendarClock size={14} /> {deadline.dateLabel}
-          </span>
-          <span>{deadline.label}</span>
+      <div className="node-accent" style={{ backgroundColor: meta.color }} />
+      
+      {/* Profile Indicator for In Progress nodes */}
+      {data.status === "in_progress" && (
+        <div className="absolute top-4 right-4 z-10 animate-bounce">
+          <div className="h-10 w-10 overflow-hidden rounded-full border-2 border-white bg-secondary shadow-lg">
+             <Avatar size={40} />
+          </div>
         </div>
       )}
-      <Handle type="source" position={Position.Right} />
+
+      <Handle type="target" position={Position.Left} className="!h-3 !w-3 !border-[3px] !border-white !bg-secondary !shadow-sm" />
+      
+      <div className="mb-4 flex items-center justify-between">
+        <div className={clsx("rounded-full px-3 py-1 text-[10px] font-bold tracking-widest uppercase", meta.className)}>
+          {data.locked ? "LOCKED" : meta.label}
+        </div>
+        {data.locked && <Lock size={14} className="text-on-surface-variant" />}
+      </div>
+
+      <h3 className="mb-2 line-clamp-2 text-xl font-extrabold leading-tight text-on-surface">
+        {data.title}
+      </h3>
+      <p className="mb-6 line-clamp-2 text-sm font-medium leading-relaxed text-on-surface-variant">
+        {data.description || "No description provided."}
+      </p>
+
+      <div className="space-y-4">
+        <div className="flex items-end justify-between">
+          <div className="flex flex-col gap-1">
+             <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant opacity-60">Progress</span>
+             <span className="text-lg font-extrabold text-secondary leading-none">{progressPercent}%</span>
+          </div>
+          <div className="flex flex-col items-end gap-1">
+             <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant opacity-60">Status</span>
+             <span className="text-[10px] font-extrabold text-on-surface">{data.forgePassed ? "FORGE PASSED" : "PENDING"}</span>
+          </div>
+        </div>
+        
+        <div className="h-2.5 w-full overflow-hidden rounded-full bg-surface-container-highest">
+          <div 
+            className="h-full rounded-full transition-all duration-700 ease-out" 
+            style={{ width: `${progressPercent}%`, backgroundColor: meta.color }} 
+          />
+        </div>
+
+        <div className="flex items-center justify-between rounded-xl bg-surface-container-low/50 p-3">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-on-surface">
+              <SquareCheck size={14} className="text-secondary" /> {completedTasks}/{tasks.length}
+            </div>
+            {urgentTasks > 0 && (
+              <div className="flex items-center gap-1.5 text-xs font-bold text-error">
+                <AlertTriangle size={14} /> {urgentTasks}
+              </div>
+            )}
+          </div>
+          <span className="text-[10px] font-bold text-on-surface-variant opacity-60">ORDER {data.orderIndex}</span>
+        </div>
+
+        {deadline && (
+          <div
+            className={clsx(
+              "flex items-center justify-between rounded-xl border px-3 py-2.5 text-[11px] font-bold transition-colors",
+              deadline.tone === "overdue" && "border-error/20 bg-error/5 text-error",
+              deadline.tone === "today" && "border-rose-300 bg-rose-50 text-rose-700",
+              deadline.tone === "h1" && "border-orange-300 bg-orange-50 text-orange-700",
+              deadline.tone === "h2" && "border-amber-300 bg-amber-50 text-amber-700",
+              deadline.tone === "h3" && "border-yellow-300 bg-yellow-50 text-yellow-700",
+              deadline.tone === "neutral" && "border-outline-variant bg-white/50 text-on-surface-variant",
+              deadline.tone === "done" && "border-emerald-200 bg-emerald-50 text-emerald-700"
+            )}
+          >
+            <span className="inline-flex items-center gap-1.5">
+              <CalendarClock size={14} /> {deadline.dateLabel}
+            </span>
+            <span className="uppercase tracking-wider">{deadline.label}</span>
+          </div>
+        )}
+      </div>
+
+      <Handle type="source" position={Position.Right} className="!h-3 !w-3 !border-[3px] !border-white !bg-secondary !shadow-sm" />
     </div>
   );
 }
@@ -578,7 +572,14 @@ export default function FoundryDashboard() {
   const [evaluation, setEvaluation] = useState<ForgeEvaluation | null>(null);
   const [profileName, setProfileName] = useState("");
   const [currentUserId, setCurrentUserId] = useState("guest");
+  const [deadlineNow, setDeadlineNow] = useState(Date.now());
   const hydratedRef = useRef(false);
+  const saveTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setDeadlineNow(Date.now()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     const hydrate = async () => {
@@ -660,24 +661,44 @@ export default function FoundryDashboard() {
 
   useEffect(() => {
     if (!hydratedRef.current || !roadmaps.length) return;
-    setRoadmaps((items) => {
-      const next = items.map((roadmap) =>
-        roadmap.id === activeId ? { ...roadmap, nodes: applyLocks(nodes, edges), edges, updatedAt: new Date().toISOString() } : roadmap
-      );
-      window.localStorage.setItem(scopedKey(currentUserId, "roadmaps"), JSON.stringify(next));
-      void getAuthHeaders().then((headers) => fetch("/api/roadmaps", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", ...headers },
-        body: JSON.stringify({ roadmaps: next })
-      })).catch(() => undefined);
-      return next;
-    });
-  }, [nodes, edges, activeId, currentUserId]);
+    if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = window.setTimeout(() => {
+      setRoadmaps((items) => {
+        const next = items.map((roadmap) =>
+          roadmap.id === activeId ? { ...roadmap, nodes: applyLocks(nodes, edges), edges, updatedAt: new Date().toISOString() } : roadmap
+        );
+        window.localStorage.setItem(scopedKey(currentUserId, "roadmaps"), JSON.stringify(next));
+        void getAuthHeaders().then((headers) => fetch("/api/roadmaps", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", ...headers },
+          body: JSON.stringify({ roadmaps: next })
+        })).catch(() => undefined);
+        return next;
+      });
+    }, 900);
+    return () => {
+      if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
+    };
+  }, [nodes, edges, activeId, currentUserId, roadmaps.length]);
 
   const activeRoadmap = roadmaps.find((roadmap) => roadmap.id === activeId);
   const selectedNode = useMemo(() => nodes.find((node) => node.id === selectedNodeId) ?? null, [nodes, selectedNodeId]);
   const selectedNodeTasks = selectedNode?.data.tasks ?? [];
   const progress = nodes.length ? Math.round((nodes.filter((node) => node.data.status === "completed").length / nodes.length) * 100) : 0;
+  const roadmapProgress = useCallback((roadmap: Roadmap) => {
+    const total = roadmap.nodes.length;
+    if (!total) return 0;
+    return Math.round((roadmap.nodes.filter((node) => node.data.status === "completed").length / total) * 100);
+  }, []);
+  const canvasTags = useMemo(() => {
+    const source = nodes.length ? nodes : activeRoadmap?.nodes ?? [];
+    const tags = source
+      .slice(0, 6)
+      .map((node) => node.data.title.split(/\s+/).find((word) => word.length > 3) ?? node.data.title)
+      .map((word) => `#${word.toLowerCase().replace(/[^a-z0-9]/gi, "")}`)
+      .filter((tag) => tag.length > 1);
+    return tags.length ? tags : ["#foundry", "#learning", "#roadmap", "#mastery"];
+  }, [activeRoadmap?.nodes, nodes]);
 
   const buildGeneratedGraph = useCallback(
     (generated: GeneratedPathNode[], base = 0) => {
@@ -850,15 +871,6 @@ export default function FoundryDashboard() {
     setNodes((items) => items.filter((node) => node.id !== selectedNodeId));
     setEdges((items) => items.filter((edge) => edge.source !== selectedNodeId && edge.target !== selectedNodeId));
     setSelectedNodeId(null);
-  };
-
-  const handleLogout = async () => {
-    const supabase = getSupabaseBrowserClient();
-    if (supabase) {
-      await supabase.auth.signOut();
-    }
-    window.localStorage.removeItem("foundry-active-user-id");
-    router.push("/login");
   };
 
   const autoLayout = () => {
@@ -1208,112 +1220,160 @@ export default function FoundryDashboard() {
   };
 
   return (
-    <main className="flex h-screen overflow-hidden bg-background text-on-surface">
-      <aside className={clsx("z-20 flex w-72 shrink-0 flex-col border-r border-outline-variant bg-white/90 px-3 py-5 backdrop-blur fixed inset-y-0 left-0 transition-transform duration-300 lg:relative lg:translate-x-0", sidebarOpen ? "translate-x-0" : "-translate-x-full")}>
-        <div className="mb-7 px-3">
-          <div className="flex items-center gap-3">
-            <BrandLogo size={44} className="shadow-lg shadow-primary-container/20" />
-            <div>
-              <h1 className="text-2xl font-bold text-primary">Foundry</h1>
-              <p className="text-xs font-medium text-on-variant">Learning Path Builder</p>
+    <main className="foundry-canvas-bg relative flex h-screen overflow-hidden text-on-surface">
+      <div className="pointer-events-none absolute inset-0 canvas-grid opacity-70" />
+      <div className="pointer-events-none absolute -left-44 -top-44 hidden h-[520px] w-[520px] rounded-full bg-primary-fixed-dim/45 blur-[90px] sm:block" />
+      <div className="pointer-events-none absolute -bottom-48 left-1/3 hidden h-[600px] w-[600px] rounded-full bg-tertiary-fixed/35 blur-[100px] sm:block" />
+      <div className="pointer-events-none absolute -right-40 top-1/4 hidden h-[480px] w-[480px] rounded-full bg-secondary/12 blur-[90px] sm:block" />
+
+      <aside className={clsx("foundry-glass fixed inset-x-3 bottom-24 z-40 mx-auto flex max-h-[72vh] w-[min(980px,calc(100vw-24px))] shrink-0 flex-col rounded-[32px] px-4 py-5 transition-all duration-300 sm:bottom-28 sm:px-5", sidebarOpen ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-8 opacity-0")}>
+        <div className="mb-5 flex items-center justify-between gap-4 px-2">
+          <div className="flex min-w-0 items-center gap-4">
+            <BrandLogo size={52} />
+            <div className="min-w-0">
+              <h1 className="text-2xl font-black tracking-tight text-on-surface">Foundry</h1>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Learning Path Builder</p>
             </div>
           </div>
-        </div>
-        <button onClick={() => setRoadmapModalOpen(true)} className="mb-4 inline-flex items-center justify-center gap-2 rounded-lg bg-primary-container px-4 py-3 text-sm font-bold text-white shadow-lg shadow-primary-container/20">
-          <Plus size={17} /> Roadmap Baru
-        </button>
-        <nav className="flex-1 space-y-2 overflow-auto pr-1">
-          {roadmaps.length === 0 && (
-            <div className="rounded-xl border border-dashed border-outline-variant bg-surface-low/70 p-4 text-sm leading-6 text-on-variant">
-              Belum ada roadmap. Klik `Roadmap Baru` untuk mulai.
-            </div>
-          )}
-          {roadmaps.map((roadmap) => (
-            <div
-              key={roadmap.id}
-              className={clsx("group flex items-start gap-2 rounded-xl border p-3 transition", roadmap.id === activeId ? "border-primary-container bg-primary-container/10" : "border-transparent hover:bg-surface-low")}
-            >
-              {renameRoadmapId === roadmap.id ? (
-                <input
-                  autoFocus
-                  value={renameRoadmapTitle}
-                  onChange={(e) => setRenameRoadmapTitle(e.target.value)}
-                  onBlur={confirmRename}
-                  onKeyDown={(e) => { if (e.key === "Enter") confirmRename(); if (e.key === "Escape") setRenameRoadmapId(null); }}
-                  className="min-w-0 flex-1 rounded-lg border border-primary-container bg-white px-2 py-1 text-sm font-semibold outline-none focus:ring-2 focus:ring-primary-container/50"
-                />
-              ) : (
-                <button onClick={() => selectRoadmap(roadmap.id)} className="min-w-0 flex-1 text-left">
-                  <div className="truncate font-semibold">{roadmap.title}</div>
-                  <div className="mt-1 font-geist text-xs text-on-variant">{new Date(roadmap.updatedAt).toLocaleDateString("id-ID")}</div>
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => startRename(roadmap.id, roadmap.title)}
-                className="rounded-lg p-1.5 text-slate-400 opacity-0 transition hover:bg-violet-50 hover:text-primary group-hover:opacity-100"
-                aria-label={`Rename ${roadmap.title}`}
-              >
-                <Pencil size={15} />
-              </button>
-              <button
-                type="button"
-                onClick={() => setDeleteRoadmapId(roadmap.id)}
-                className="rounded-lg p-1.5 text-slate-400 opacity-0 transition hover:bg-red-50 hover:text-red-600 group-hover:opacity-100"
-                aria-label={`Hapus ${roadmap.title}`}
-              >
-                <Trash2 size={15} />
-              </button>
-            </div>
-          ))}
-        </nav>
-        <div className="mt-5 border-t border-outline-variant pt-4">
-          <Link href="/settings" className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold hover:bg-surface-low">
-            <Avatar size={36} />
-            <span className="flex-1 truncate">{profileName}</span>
-            <Settings size={17} />
-          </Link>
-          <button
-            onClick={handleLogout}
-            className="mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-on-variant hover:bg-slate-100 text-left"
-          >
-            <LogOut size={17} /> Logout
+          <button onClick={() => setSidebarOpen(false)} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/70 text-on-surface-variant transition hover:bg-black hover:text-white">
+            <X size={18} />
           </button>
         </div>
-      </aside>
+        
+        <div className="mb-5 px-2">
+          <button onClick={() => setRoadmapModalOpen(true)} className="foundry-action w-full py-3 text-sm sm:w-auto sm:px-6">
+            <Plus size={18} /> Roadmap Baru
+          </button>
+        </div>
 
-      {sidebarOpen && <div className="fixed inset-0 z-10 bg-black/30 lg:hidden" onClick={() => setSidebarOpen(false)} />}
+        <div className="mb-3 flex items-center justify-between px-2 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+          <span>My Roadmaps</span>
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-secondary/10 text-secondary">{roadmaps.length}</span>
+        </div>
 
-      <section className="relative flex min-w-0 flex-1 flex-col">
-        <div className="absolute inset-0 dot-grid opacity-80" />
-        <header className="z-10 flex items-center justify-between border-b border-outline-variant bg-white/75 px-4 py-3 sm:px-6 sm:py-4 backdrop-blur">
-          <div className="flex items-center gap-3 min-w-0">
-            <button onClick={() => setSidebarOpen(!sidebarOpen)} className="rounded-lg p-2 hover:bg-surface-low lg:hidden">
-              <LayoutGrid size={20} />
-            </button>
-            <div className="min-w-0">
-              <h2 className="text-lg sm:text-xl font-bold truncate">{activeRoadmap?.title ?? "Foundry Canvas"}</h2>
-              <p className="text-xs sm:text-sm text-on-variant truncate">
-                {activeRoadmap ? `${progress}% progress. Dependency-aware canvas dengan Forge Test gateway.` : "Pilih atau buat roadmap untuk mulai menyusun learning path."}
-              </p>
-            </div>
-          </div>
-          {activeRoadmap && (
-            <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-              <button onClick={() => setNodeModalOpen(true)} className="inline-flex items-center gap-1.5 rounded-lg border border-outline-variant bg-white px-2 py-1.5 text-xs sm:px-3 sm:py-2 sm:text-sm font-semibold hover:border-primary-container">
-                <Plus size={15} className="sm:hidden" /><Plus size={17} className="hidden sm:block" /> <span className="hidden sm:inline">Add Node</span>
-              </button>
-              <button onClick={() => setDraftOpen(true)} className="inline-flex items-center gap-1.5 rounded-lg border border-outline-variant bg-white px-2 py-1.5 text-xs sm:px-3 sm:py-2 sm:text-sm font-semibold hover:border-primary-container">
-                <Sparkles size={15} className="sm:hidden" /><Sparkles size={17} className="hidden sm:block" /> <span className="hidden sm:inline">AI Generate</span>
-              </button>
-              <button onClick={autoLayout} className="inline-flex items-center gap-1.5 rounded-lg bg-primary-container px-2 py-1.5 text-xs sm:px-3 sm:py-2 sm:text-sm font-bold text-white">
-                <LayoutGrid size={15} className="sm:hidden" /><LayoutGrid size={17} className="hidden sm:block" /> <span className="hidden sm:inline">Auto Layout</span>
-              </button>
+        <nav className="custom-scrollbar grid flex-1 gap-3 overflow-auto px-1 sm:grid-cols-2 lg:grid-cols-3">
+          {roadmaps.length === 0 && (
+            <div className="rounded-[24px] border border-dashed border-outline-variant bg-white/40 p-5 text-center">
+               <p className="text-xs font-medium leading-relaxed text-on-surface-variant">Belum ada roadmap. Mulai perjalananmu sekarang.</p>
             </div>
           )}
+          {roadmaps.map((roadmap) => {
+            const percent = roadmapProgress(roadmap);
+            const completedTasks = roadmap.nodes.reduce((total, node) => total + (node.data.tasks ?? []).filter((task) => task.completed).length, 0);
+            const totalTasks = roadmap.nodes.reduce((total, node) => total + (node.data.tasks ?? []).length, 0);
+            return (
+              <div
+                key={roadmap.id}
+                className={clsx("group relative overflow-hidden rounded-[24px] border p-4 transition-all", roadmap.id === activeId ? "border-secondary/30 bg-white/80 shadow-secondary-glow" : "border-white/50 bg-white/45 hover:-translate-y-0.5 hover:bg-white/75")}
+              >
+                {roadmap.id === activeId && <div className="absolute left-0 top-0 h-full w-1.5 bg-secondary" />}
+                
+                {renameRoadmapId === roadmap.id ? (
+                  <input
+                    autoFocus
+                    value={renameRoadmapTitle}
+                    onChange={(e) => setRenameRoadmapTitle(e.target.value)}
+                    onBlur={confirmRename}
+                    onKeyDown={(e) => { if (e.key === "Enter") confirmRename(); if (e.key === "Escape") setRenameRoadmapId(null); }}
+                    className="min-w-0 flex-1 rounded-xl border border-secondary/30 bg-white px-3 py-2 text-sm font-bold text-on-surface outline-none ring-4 ring-secondary/10"
+                  />
+                ) : (
+                  <button onClick={() => { selectRoadmap(roadmap.id); setSidebarOpen(false); }} className="min-w-0 flex-1 text-left">
+                    <div className="truncate pr-16 text-base font-black text-on-surface">{roadmap.title}</div>
+                    <div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">{new Date(roadmap.updatedAt).toLocaleDateString("id-ID")}</div>
+                    <div className="mt-4 flex items-end justify-between">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">Progress</span>
+                      <span className="text-xl font-black text-secondary">{percent}%</span>
+                    </div>
+                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface-container-highest">
+                      <div className="h-full rounded-full bg-secondary transition-all" style={{ width: `${percent}%` }} />
+                    </div>
+                    <div className="mt-3 flex flex-wrap items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
+                      <span>{roadmap.nodes.length} nodes</span>
+                      <span>•</span>
+                      <span>{completedTasks}/{totalTasks} tasks</span>
+                    </div>
+                  </button>
+                )}
+                
+                <div className="absolute right-3 top-3 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                  <button type="button" onClick={() => startRename(roadmap.id, roadmap.title)} className="rounded-full bg-white/70 p-1.5 text-on-surface-variant hover:text-secondary">
+                    <Pencil size={14} />
+                  </button>
+                  <button type="button" onClick={() => setDeleteRoadmapId(roadmap.id)} className="rounded-full bg-white/70 p-1.5 text-on-surface-variant hover:text-error">
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </nav>
+
+      </aside>
+
+      {sidebarOpen && <div className="fixed inset-0 z-30 bg-primary-container/20 backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />}
+
+      <section className="relative flex min-w-0 flex-1 flex-col transition-all duration-500">
+        <div className="pointer-events-none absolute inset-0" />
+        
+        {canvasTags.slice(0, 6).map((tag, index) => (
+          <div
+            key={`${tag}-${index}`}
+            className={clsx("pointer-events-none fixed hidden rounded-full border border-white/30 bg-white/25 px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-secondary/35 backdrop-blur-md sm:block", index % 2 === 0 && "animate-float")}
+            style={{
+              top: ["16%", "42%", "72%", "24%", "62%", "82%"][index],
+              left: ["28%", "12%", "45%", "76%", "66%", "22%"][index],
+              animationDelay: `${index * 0.5}s`
+            }}
+          >
+            {tag}
+          </div>
+        ))}
+
+        <header className="pointer-events-none fixed left-0 right-0 top-4 z-20 flex justify-center px-3 sm:top-6">
+          <div className="foundry-pill pointer-events-auto flex w-full max-w-[760px] items-center justify-between gap-3 px-4 py-3 sm:w-auto sm:min-w-[620px] sm:px-6">
+            <button onClick={() => setSidebarOpen(true)} className="flex h-11 w-11 items-center justify-center rounded-full bg-black text-white shadow-secondary-glow" aria-label="Open roadmaps">
+              <GitBranch size={19} />
+            </button>
+            <div className="min-w-0 flex-1 sm:min-w-[220px]">
+              <h2 className="truncate text-sm font-black tracking-tight text-on-surface sm:text-base">{activeRoadmap?.title ?? "Foundry Canvas"}</h2>
+              <p className="mt-0.5 truncate text-[9px] font-black uppercase tracking-widest text-on-surface-variant">{activeRoadmap ? `${progress}% progress - synced` : "Pilih roadmap untuk mulai"}</p>
+            </div>
+            {activeRoadmap && (
+              <div className="flex shrink-0 items-center gap-2">
+                <button onClick={() => setDraftOpen(true)} className="foundry-action hidden sm:inline-flex">
+                  <Sparkles size={16} /> AI Generate
+                </button>
+                <button onClick={() => setNodeModalOpen(true)} className="foundry-ghost-action h-11 w-11 rounded-full p-0" aria-label="Add Node">
+                  <Plus size={20} />
+                </button>
+                <button onClick={autoLayout} className="foundry-ghost-action hidden h-11 w-11 rounded-full p-0 sm:inline-flex" aria-label="Auto Layout">
+                  <LayoutGrid size={18} />
+                </button>
+              </div>
+            )}
+          </div>
         </header>
 
-        <div className="relative min-h-0 flex-1">
+        {activeRoadmap && (
+          <div className="pointer-events-none fixed bottom-4 left-0 right-0 z-20 flex justify-center px-4 sm:bottom-6">
+            <div className="foundry-pill pointer-events-auto flex items-center gap-2 px-3 py-3">
+              <button onClick={() => setSidebarOpen(true)} className="foundry-action">
+                <GitBranch size={16} /> My Roadmaps
+              </button>
+              <button onClick={() => setDraftOpen(true)} className="foundry-ghost-action sm:hidden">
+                <Sparkles size={16} /> AI
+              </button>
+              <button onClick={() => router.push("/settings")} className="foundry-ghost-action max-w-[190px] px-2 py-1.5">
+                <Avatar size={28} />
+                <span className="hidden max-w-[110px] truncate sm:inline">{profileName || "User"}</span>
+                <Settings size={15} />
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className="relative min-h-0 flex-1 pt-20">
           {!activeRoadmap && (
             <div className="absolute inset-0 z-10 flex items-center justify-center p-6">
               <div className="max-w-md rounded-2xl border border-outline-variant bg-white/90 p-6 text-center shadow-ambient backdrop-blur">
@@ -1325,68 +1385,73 @@ export default function FoundryDashboard() {
               </div>
             </div>
           )}
-          <ReactFlow
-            className="foundry-flow"
-            nodes={nodes}
-            edges={edges}
-            nodeTypes={nodeTypes}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            onNodeClick={(_, node) => {
-              if (node.data.locked) {
-                setSelectedNodeId(null);
+          <DeadlineNowContext.Provider value={deadlineNow}>
+            <ReactFlow
+              className="foundry-flow"
+              nodes={nodes}
+              edges={edges}
+              nodeTypes={nodeTypes}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              onConnect={onConnect}
+              onlyRenderVisibleElements
+              onNodeClick={(_, node) => {
+                if (node.data.locked) {
+                  setSelectedNodeId(null);
+                  setSelectedEdgeId(null);
+                  return;
+                }
+                setSelectedNodeId(node.id);
                 setSelectedEdgeId(null);
-                return;
-              }
-              setSelectedNodeId(node.id);
-              setSelectedEdgeId(null);
-              setTab("overview");
-              setSidebarOpen(false);
-            }}
-            onEdgeClick={(_, edge) => {
-              setSelectedEdgeId(edge.id);
-              setSelectedNodeId(null);
-              setSidebarOpen(false);
-            }}
-            fitView
-          >
-            <Background variant={BackgroundVariant.Dots} gap={24} size={1} color="#ccc3d8" />
-            <MiniMap nodeStrokeColor="#7C3AED" nodeColor="#F2F3FF" maskColor="rgba(248, 247, 255, .65)" />
-            <Controls />
-          </ReactFlow>
+                setTab("overview");
+                setSidebarOpen(false);
+              }}
+              onEdgeClick={(_, edge) => {
+                setSelectedEdgeId(edge.id);
+                setSelectedNodeId(null);
+                setSidebarOpen(false);
+              }}
+              fitView
+            >
+              <Background variant={BackgroundVariant.Dots} gap={32} size={1} color="#d9cfe0" />
+              <MiniMap nodeStrokeColor="#7C3AED" nodeColor="#F2F3FF" maskColor="rgba(248, 247, 255, .65)" />
+              <Controls />
+            </ReactFlow>
+          </DeadlineNowContext.Provider>
         </div>
       </section>
 
       {selectedNode && (
-        <aside className="z-30 flex w-full sm:w-[420px] shrink-0 flex-col border-l border-outline-variant bg-white shadow-ambient fixed inset-y-0 right-0 sm:relative">
-          <div className="flex items-start justify-between border-b border-outline-variant p-5">
-            <div>
-              <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.08em] text-primary">
-                <PanelRight size={15} /> Node Detail
+        <aside className="glass-card z-30 flex w-full sm:w-[420px] shrink-0 flex-col rounded-l-[32px] border-r-0 fixed inset-y-0 right-0 sm:relative shadow-2xl">
+          <div className="flex items-start justify-between p-8">
+            <div className="min-w-0 flex-1">
+              <div className="mb-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-secondary">
+                <PanelRight size={14} /> Node Explorer
               </div>
-              <h3 className="text-xl font-bold">{selectedNode.data.title}</h3>
+              <h3 className="truncate text-2xl font-black tracking-tight text-on-surface">{selectedNode.data.title}</h3>
             </div>
-            <button onClick={() => setSelectedNodeId(null)} className="rounded-lg p-2 hover:bg-surface-low">
-              <X size={18} />
+            <button onClick={() => setSelectedNodeId(null)} className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-container-low text-on-surface-variant transition-all hover:bg-secondary hover:text-white">
+              <X size={20} />
             </button>
           </div>
-          <div className="grid grid-cols-4 border-b border-outline-variant p-2">
+          
+          <div className="mx-8 mb-6 grid grid-cols-4 gap-1 rounded-full bg-surface-container-low p-1.5">
             {(["overview", "tasks", "chat", "forge"] as Tab[]).map((item) => (
-              <button key={item} onClick={() => setTab(item)} className={clsx("rounded-lg px-3 py-2 text-sm font-semibold capitalize", tab === item ? "bg-primary-container text-white" : "text-on-variant hover:bg-surface-low")}>
+              <button key={item} onClick={() => setTab(item)} className={clsx("rounded-full py-2.5 text-[10px] font-bold uppercase tracking-widest transition-all", tab === item ? "bg-secondary text-white shadow-lg shadow-secondary/20" : "text-on-surface-variant hover:bg-white/50")}>
                 {item}
               </button>
             ))}
           </div>
-          <div className="min-h-0 flex-1 overflow-auto p-5">
+
+          <div className="min-h-0 flex-1 overflow-auto px-8 pb-8 custom-scrollbar">
             {tab === "overview" && (
-              <div className="space-y-4">
+              <div className="space-y-6">
                 <label className="block">
-                  <span className="font-geist text-xs font-bold uppercase tracking-[0.08em] text-on-variant">Status</span>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant opacity-60">Node Status</span>
                   <select
                     value={selectedNode.data.status}
                     onChange={(event) => updateNodeData(selectedNode.id, { status: event.target.value as Status, forgePassed: event.target.value === "completed" ? selectedNode.data.forgePassed : false })}
-                    className="mt-2 w-full rounded-lg border border-outline-variant px-3 py-2 text-sm focus:ring-2 focus:ring-primary-container/20"
+                    className="mt-2 w-full rounded-xl border border-outline-variant bg-white/50 px-4 py-3 text-sm font-medium outline-none transition-all focus:border-secondary focus:ring-4 focus:ring-secondary/10"
                   >
                     <option value="not_started">Not Started</option>
                     <option value="in_progress">In Progress</option>
@@ -1394,82 +1459,84 @@ export default function FoundryDashboard() {
                   </select>
                 </label>
                 <label className="block">
-                  <span className="font-geist text-xs font-bold uppercase tracking-[0.08em] text-on-variant">Judul</span>
-                  <input value={selectedNode.data.title} onChange={(event) => updateNodeData(selectedNode.id, { title: event.target.value })} className="mt-2 w-full rounded-lg border border-outline-variant px-3 py-2 text-sm focus:ring-2 focus:ring-primary-container/20" />
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant opacity-60">Topik Utama</span>
+                  <input value={selectedNode.data.title} onChange={(event) => updateNodeData(selectedNode.id, { title: event.target.value })} className="mt-2 w-full rounded-xl border border-outline-variant bg-white/50 px-4 py-3 text-sm font-bold outline-none transition-all focus:border-secondary focus:ring-4 focus:ring-secondary/10" />
                 </label>
                 <label className="block">
-                  <span className="font-geist text-xs font-bold uppercase tracking-[0.08em] text-on-variant">Deskripsi</span>
-                  <textarea value={selectedNode.data.description} onChange={(event) => updateNodeData(selectedNode.id, { description: event.target.value })} className="mt-2 min-h-24 w-full rounded-lg border border-outline-variant px-3 py-2 text-sm focus:ring-2 focus:ring-primary-container/20" />
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant opacity-60">Deskripsi Singkat</span>
+                  <textarea value={selectedNode.data.description} onChange={(event) => updateNodeData(selectedNode.id, { description: event.target.value })} className="mt-2 min-h-24 w-full rounded-xl border border-outline-variant bg-white/50 px-4 py-3 text-sm font-medium outline-none transition-all focus:border-secondary focus:ring-4 focus:ring-secondary/10 resize-none" />
                 </label>
                 <div>
-                  <span className="font-geist text-xs font-bold uppercase tracking-[0.08em] text-on-variant">Catatan pribadi</span>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant opacity-60">Catatan Personal</span>
                   <div
                     contentEditable
                     suppressContentEditableWarning
-                    data-placeholder="Tulis catatan, bullet, atau potongan kode di sini..."
+                    data-placeholder="Tulis insight atau materi penting di sini..."
                     onBlur={(event) => updateNodeData(selectedNode.id, { notes: event.currentTarget.innerHTML })}
-                    className="content-editable mt-2 min-h-36 rounded-lg border border-outline-variant bg-white px-3 py-2 text-sm leading-6 outline-none focus:ring-2 focus:ring-primary-container/20"
+                    className="content-editable mt-2 min-h-[200px] rounded-2xl border border-outline-variant bg-white px-4 py-4 text-sm leading-relaxed outline-none transition-all focus:border-secondary focus:ring-4 focus:ring-secondary/10"
                     dangerouslySetInnerHTML={{ __html: selectedNode.data.notes }}
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <button onClick={deleteSelected} className="inline-flex items-center justify-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-600">
-                    <Trash2 size={16} /> Delete
+                <div className="grid grid-cols-2 gap-3 pt-4">
+                  <button onClick={deleteSelected} className="flex h-12 items-center justify-center gap-2 rounded-full border border-error/20 bg-error/5 text-sm font-bold text-error transition-all hover:bg-error/10">
+                    <Trash2 size={18} /> Delete Node
                   </button>
-                  <button className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary-container px-3 py-2 text-sm font-bold text-white">
-                    <Save size={16} /> Saved
+                  <button className="flex h-12 items-center justify-center gap-2 rounded-full bg-secondary text-sm font-bold text-white shadow-secondary-glow hover:bg-secondary/90">
+                    <Save size={18} /> Simpan
                   </button>
                 </div>
               </div>
             )}
 
             {tab === "tasks" && (
-              <div className="space-y-4">
-                <div className="rounded-xl border border-outline-variant bg-surface-low p-4">
-                  <div className="mb-1 flex items-center gap-2 font-bold">
-                    <SquareCheck size={18} className="text-primary" /> Task Node
+              <div className="space-y-6">
+                <div className="rounded-[20px] border border-secondary/10 bg-secondary/5 p-6 backdrop-blur-sm shadow-sm">
+                  <div className="mb-2 flex items-center gap-2 text-sm font-black text-secondary uppercase tracking-tight">
+                    <SquareCheck size={20} /> Task Checklist
                   </div>
-                  <p className="text-sm leading-6 text-on-variant">
-                    Checklist semua task untuk menandai node siap diselesaikan. Deadline H-1 atau lewat deadline akan diberi tanda merah.
+                  <p className="text-xs font-medium leading-relaxed text-on-surface-variant opacity-80">
+                    Selesaikan semua tugas di bawah untuk membuka kunci Forge Test. Fokus pada kualitas pemahaman.
                   </p>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {selectedNodeTasks.length === 0 && (
-                    <div className="rounded-xl border border-dashed border-outline-variant p-4 text-sm text-on-variant">Belum ada task untuk node ini.</div>
+                    <div className="rounded-2xl border border-dashed border-outline-variant p-8 text-center">
+                       <p className="text-xs font-bold text-on-surface-variant opacity-40 uppercase tracking-widest">Belum ada task aktif</p>
+                    </div>
                   )}
                   {selectedNodeTasks.map((task) => {
                     const reminder = taskReminder(task);
                     return (
-                      <div key={task.id} className={clsx("rounded-xl border p-3", reminder?.tone === "danger" ? "border-red-200 bg-red-50" : reminder?.tone === "warning" ? "border-amber-200 bg-amber-50" : "border-outline-variant bg-white")}>
-                        <div className="flex items-start gap-3">
+                      <div key={task.id} className={clsx("rounded-2xl border p-4 transition-all", reminder?.tone === "danger" ? "border-error/20 bg-error/5 shadow-ambient" : reminder?.tone === "warning" ? "border-amber-200 bg-amber-50/50" : "border-outline-variant bg-white/50 hover:bg-white")}>
+                        <div className="flex items-start gap-4">
                           <input
                             checked={task.completed}
                             onChange={(event) => patchTask(task.id, { completed: event.target.checked })}
                             type="checkbox"
-                            className="mt-1 rounded border-outline-variant text-primary-container focus:ring-primary-container/20"
+                            className="mt-1 h-5 w-5 rounded-full border-outline-variant text-secondary focus:ring-secondary/20 transition-all cursor-pointer"
                           />
                           <div className="min-w-0 flex-1">
-                            <p className={clsx("text-sm font-semibold leading-6", task.completed && "text-on-variant line-through")}>{task.title}</p>
-                            <div className="mt-2 flex flex-wrap items-center gap-2">
-                              <label className="inline-flex items-center gap-2 rounded-lg border border-outline-variant bg-white px-2 py-1 text-xs text-on-variant">
-                                <CalendarClock size={14} />
+                            <p className={clsx("text-sm font-bold leading-relaxed", task.completed ? "text-on-surface-variant/40 line-through" : "text-on-surface")}>{task.title}</p>
+                            <div className="mt-3 flex flex-wrap items-center gap-2">
+                              <label className="inline-flex items-center gap-2 rounded-full border border-outline-variant bg-white px-3 py-1.5 text-[10px] font-bold text-on-surface-variant">
+                                <CalendarClock size={14} className="text-secondary" />
                                 <input
                                   value={task.dueDate ?? ""}
                                   onChange={(event) => patchTask(task.id, { dueDate: event.target.value || undefined })}
                                   type="date"
-                                  className="border-0 bg-transparent p-0 text-xs outline-none focus:ring-0"
+                                  className="border-0 bg-transparent p-0 text-[10px] font-bold outline-none focus:ring-0 uppercase"
                                 />
                               </label>
                               {reminder && (
-                                <span className={clsx("inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-bold", reminder.tone === "danger" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700")}>
-                                  <AlertTriangle size={13} /> {reminder.label}
+                                <span className={clsx("inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-wider", reminder.tone === "danger" ? "bg-error/10 text-error" : "bg-amber-100 text-amber-700")}>
+                                  <AlertTriangle size={12} /> {reminder.label}
                                 </span>
                               )}
                             </div>
                           </div>
-                          <button onClick={() => deleteTask(task.id)} className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600">
-                            <Trash2 size={15} />
+                          <button onClick={() => deleteTask(task.id)} className="rounded-full p-2 text-on-surface-variant opacity-40 transition-all hover:bg-error/10 hover:text-error hover:opacity-100">
+                            <Trash2 size={16} />
                           </button>
                         </div>
                       </div>
@@ -1477,77 +1544,100 @@ export default function FoundryDashboard() {
                   })}
                 </div>
 
-                <div className="rounded-xl border border-outline-variant p-3">
+                <div className="rounded-[20px] border border-outline-variant bg-white/30 p-6 backdrop-blur-sm shadow-sm">
                   <label className="block">
-                    <span className="font-geist text-xs font-bold uppercase tracking-[0.08em] text-on-variant">Task baru</span>
-                    <input value={taskTitle} onChange={(event) => setTaskTitle(event.target.value)} className="mt-2 w-full rounded-lg border border-outline-variant px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary-container/20" placeholder="Contoh: Buat latihan function sederhana" />
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant opacity-60">Task Baru</span>
+                    <input value={taskTitle} onChange={(event) => setTaskTitle(event.target.value)} className="mt-2 w-full rounded-xl border border-outline-variant bg-white/50 px-4 py-3 text-sm font-medium outline-none transition-all focus:border-secondary focus:ring-4 focus:ring-secondary/10" placeholder="Apa yang harus dikerjakan?" />
                   </label>
-                  <label className="mt-3 block">
-                    <span className="font-geist text-xs font-bold uppercase tracking-[0.08em] text-on-variant">Deadline opsional</span>
-                    <input value={taskDueDate} onChange={(event) => setTaskDueDate(event.target.value)} type="date" className="mt-2 w-full rounded-lg border border-outline-variant px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary-container/20" />
+                  <label className="mt-4 block">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant opacity-60">Target Selesai</span>
+                    <input value={taskDueDate} onChange={(event) => setTaskDueDate(event.target.value)} type="date" className="mt-2 w-full rounded-xl border border-outline-variant bg-white/50 px-4 py-3 text-sm font-bold outline-none transition-all focus:border-secondary focus:ring-4 focus:ring-secondary/10 uppercase" />
                   </label>
-                  <div className="mt-3 flex items-center justify-between gap-3">
-                    <span className="font-geist text-xs font-semibold uppercase tracking-[0.08em] text-on-variant">{selectedNodeTasks.length}/{maxTasksPerNode} tasks</span>
-                    <button onClick={addTask} disabled={!taskTitle.trim() || selectedNodeTasks.length >= maxTasksPerNode} className="rounded-lg bg-primary-container px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-300">
+                  <div className="mt-6 flex items-center justify-between gap-3">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-secondary">{selectedNodeTasks.length}/{maxTasksPerNode} tasks</span>
+                    <button onClick={addTask} disabled={!taskTitle.trim() || selectedNodeTasks.length >= maxTasksPerNode} className="flex h-10 items-center justify-center rounded-full bg-secondary px-6 text-xs font-black uppercase tracking-widest text-white shadow-secondary-glow disabled:cursor-not-allowed disabled:bg-surface-dim disabled:text-on-surface-variant disabled:shadow-none">
                       Tambah Task
                     </button>
                   </div>
-                  {selectedNodeTasks.length >= maxTasksPerNode && <p className="mt-2 text-xs text-red-600">Batas maksimal 10 task per node. Hapus task yang kurang penting dulu.</p>}
                 </div>
               </div>
             )}
 
             {tab === "chat" && (
-              <div className="flex h-full min-h-[520px] flex-col">
-                <div className="flex-1 space-y-3 overflow-auto rounded-xl bg-surface-low p-3">
+              <div className="flex h-full min-h-[520px] flex-col space-y-4">
+                <div className="flex-1 space-y-4 overflow-auto rounded-[24px] bg-surface-container-low/50 p-4 shadow-inner custom-scrollbar">
                   {selectedNode.data.messages.length === 0 && (
-                    <div className="rounded-xl border border-outline-variant bg-white p-4 text-sm text-on-variant">
-                      Tanya AI Companion tentang {selectedNode.data.title}. History tersimpan di data node lokal.
+                    <div className="flex flex-col items-center justify-center py-10 text-center">
+                       <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-secondary/10 text-secondary">
+                          <Sparkles size={32} />
+                       </div>
+                       <p className="max-w-[200px] text-xs font-bold leading-relaxed text-on-surface-variant opacity-60 uppercase tracking-widest">Tanya AI Companion untuk memperdalam pemahamanmu.</p>
                     </div>
                   )}
                   {selectedNode.data.messages.map((message) => (
-                    <div key={message.id} className={clsx("rounded-xl p-3 text-sm leading-6", message.role === "user" ? "ml-8 bg-primary-container text-white" : "mr-8 border border-outline-variant bg-white")}>
+                    <div key={message.id} className={clsx("rounded-2xl p-4 text-sm leading-relaxed shadow-ambient", message.role === "user" ? "ml-8 bg-secondary text-white font-bold" : "mr-8 border border-white/40 bg-white/80 backdrop-blur-sm font-medium text-on-surface")}>
                       {message.role === "assistant" ? renderMessageContent(message.content) : message.content}
                     </div>
                   ))}
                 </div>
-                <div className="mt-3 flex gap-2">
-                  <input value={chatInput} onChange={(event) => setChatInput(event.target.value)} onKeyDown={(event) => event.key === "Enter" && sendChat()} className="min-w-0 flex-1 rounded-lg border border-outline-variant px-3 py-2 text-sm" placeholder="Jelasin konsep ini..." />
-                  <button onClick={sendChat} className="rounded-lg bg-primary-container px-3 text-white">
-                    <Send size={18} />
+                <div className="flex gap-2">
+                  <input
+                    value={chatInput}
+                    onChange={(event) => setChatInput(event.target.value)}
+                    onKeyDown={(event) => { if (event.key === "Enter") sendChat(); }}
+                    placeholder="Tanya sesuatu..."
+                    className="flex-1 rounded-full border border-outline-variant bg-white px-6 py-4 text-sm font-medium outline-none transition-all focus:border-secondary focus:ring-4 focus:ring-secondary/10 shadow-sm"
+                  />
+                  <button onClick={sendChat} disabled={!chatInput.trim()} className="flex h-12 w-12 items-center justify-center rounded-full bg-secondary text-white shadow-secondary-glow transition-all hover:bg-secondary/90 active:scale-95 disabled:cursor-not-allowed disabled:bg-surface-dim disabled:shadow-none">
+                    <Send size={20} />
                   </button>
                 </div>
-                <button onClick={() => updateNodeData(selectedNode.id, { messages: [] })} className="mt-2 inline-flex items-center justify-center gap-2 rounded-lg border border-outline-variant px-3 py-2 text-sm font-semibold">
-                  <RefreshCcw size={16} /> Reset Chat
+                <button onClick={() => updateNodeData(selectedNode.id, { messages: [] })} className="flex h-10 items-center justify-center gap-2 rounded-full border border-outline-variant bg-white/50 text-[10px] font-black uppercase tracking-widest text-on-surface-variant hover:bg-white hover:text-secondary transition-all">
+                  <RefreshCcw size={14} /> Reset Chat History
                 </button>
               </div>
             )}
 
             {tab === "forge" && (
-              <div className="space-y-4">
-                <div className="rounded-xl border border-outline-variant bg-surface-low p-4">
-                  <div className="mb-2 flex items-center gap-2 font-bold">
-                    {selectedNode.data.forgePassed ? <Unlock className="text-emerald-600" size={19} /> : <Lock className="text-primary" size={19} />}
+              <div className="space-y-6">
+                <div className="rounded-[24px] border border-secondary/10 bg-secondary/5 p-6 backdrop-blur-sm shadow-sm">
+                  <div className="mb-3 flex items-center gap-3 text-sm font-black text-on-surface uppercase tracking-tight">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-ambient">
+                       {selectedNode.data.forgePassed ? <Unlock className="text-emerald-600" size={20} /> : <Lock className="text-secondary" size={20} />}
+                    </div>
                     Forge Test Gateway
                   </div>
-                  <p className="text-sm leading-6 text-on-variant">Studi kasus ini menjadi syarat untuk membuka node yang bergantung pada topik ini.</p>
-                  <div className={clsx("mt-3 rounded-lg border px-3 py-2 text-xs font-semibold", forgeExpired(selectedNode) ? "border-red-200 bg-red-50 text-red-700" : "border-outline-variant bg-white text-on-variant")}>
+                  <p className="text-xs font-medium leading-relaxed text-on-surface-variant opacity-80">
+                    Studi kasus adaptif untuk memverifikasi penguasaan materi sebelum membuka node prasyarat berikutnya.
+                  </p>
+                  <div className={clsx("mt-4 rounded-xl border px-4 py-3 text-[10px] font-black uppercase tracking-widest", forgeExpired(selectedNode) ? "border-error/20 bg-error/5 text-error" : "border-outline-variant bg-white/80 text-on-surface-variant shadow-sm")}>
                     {selectedNode.data.forgeCaseStudy && forgeCaseLooksValid(selectedNode)
-                      ? `Deadline pengerjaan: ${formatForgeDeadline(selectedNode.data.forgeExpiresAt)}`
-                      : selectedNode.data.forgeCaseStudy
-                        ? "Case tersimpan tidak sesuai materi node. Klik mulai untuk membuat case baru."
-                        : "Saat mulai Forge, case akan aktif 24 jam dan tersimpan di node ini."}
+                      ? `DEADLINE: ${formatForgeDeadline(selectedNode.data.forgeExpiresAt)}`
+                      : "SIAP UNTUK DIGENERATE"}
                   </div>
                 </div>
-                {selectedNode.data.feedback && <div className="rounded-xl border border-outline-variant bg-white p-4 text-sm leading-6">{selectedNode.data.feedback}</div>}
-                <button
-                  disabled={selectedNode.data.status !== "completed"}
-                  onClick={() => void startForgeTest()}
-                  className="w-full rounded-lg bg-primary-container px-4 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-300"
-                >
-                  {testLoading ? "Menyiapkan Studi Kasus..." : selectedNode.data.forgeCaseStudy && !forgeExpired(selectedNode) && forgeCaseLooksValid(selectedNode) ? "Lanjutkan Studi Kasus" : "Mulai Studi Kasus"}
-                </button>
-                {selectedNode.data.status !== "completed" && <p className="text-sm text-on-variant">Ubah status node menjadi Completed untuk mengaktifkan test.</p>}
+
+                {selectedNode.data.feedback && (
+                  <div className="rounded-[24px] border border-white bg-white/80 p-6 shadow-ambient">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant opacity-60 mb-3">AI Evaluation Feedback</p>
+                    <div className="text-sm font-medium leading-relaxed text-on-surface">{selectedNode.data.feedback}</div>
+                  </div>
+                )}
+
+                <div className="space-y-3">
+                   <button
+                    disabled={selectedNode.data.status !== "completed"}
+                    onClick={() => void startForgeTest()}
+                    className="flex w-full h-14 items-center justify-center rounded-full bg-secondary text-sm font-black uppercase tracking-widest text-white shadow-secondary-glow transition-all hover:bg-secondary/90 active:scale-95 disabled:cursor-not-allowed disabled:bg-surface-dim disabled:text-on-surface-variant disabled:shadow-none"
+                  >
+                    {testLoading ? "Generating..." : selectedNode.data.forgeCaseStudy && !forgeExpired(selectedNode) && forgeCaseLooksValid(selectedNode) ? "Lanjutkan Studi Kasus" : "Mulai Forge Test"}
+                  </button>
+                  {selectedNode.data.status !== "completed" && (
+                    <p className="text-center text-[10px] font-bold uppercase tracking-widest text-on-surface-variant opacity-60 px-4">
+                      Selesaikan semua task untuk mengaktifkan Forge.
+                    </p>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -1555,91 +1645,105 @@ export default function FoundryDashboard() {
       )}
 
       {selectedEdgeId && !selectedNode && (
-        <aside className="z-30 flex w-full sm:w-[420px] shrink-0 flex-col border-l border-outline-variant bg-white shadow-ambient fixed inset-y-0 right-0 sm:relative">
-          <div className="flex items-start justify-between border-b border-outline-variant p-5">
-            <div>
-              <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.08em] text-primary">
-                <GitBranch size={15} /> Dependency Detail
+        <aside className="glass-card z-30 flex w-full sm:w-[420px] shrink-0 flex-col rounded-l-[32px] border-r-0 fixed inset-y-0 right-0 sm:relative shadow-2xl">
+          <div className="flex items-start justify-between p-8">
+            <div className="min-w-0 flex-1">
+              <div className="mb-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-secondary">
+                <GitBranch size={14} /> Connection Info
               </div>
-              <h3 className="text-xl font-bold">Koneksi Prasyarat</h3>
+              <h3 className="truncate text-2xl font-black tracking-tight text-on-surface">Koneksi Prasyarat</h3>
             </div>
-            <button onClick={() => setSelectedEdgeId(null)} className="rounded-lg p-2 hover:bg-surface-low">
-              <X size={18} />
+            <button onClick={() => setSelectedEdgeId(null)} className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-container-low text-on-surface-variant transition-all hover:bg-secondary hover:text-white">
+              <X size={20} />
             </button>
           </div>
-          <div className="min-h-0 flex-1 overflow-auto p-5 space-y-4">
-            <div className="rounded-xl border border-outline-variant bg-surface-low p-4">
-              <p className="text-sm leading-6 text-on-variant">
-                Hubungan ini menandakan bahwa topik asal harus diselesaikan terlebih dahulu sebelum topik tujuan dapat diakses (unlocked).
+          
+          <div className="min-h-0 flex-1 overflow-auto px-8 pb-8 space-y-6">
+            <div className="rounded-[24px] border border-secondary/10 bg-secondary/5 p-6 backdrop-blur-sm shadow-sm">
+              <p className="text-xs font-medium leading-relaxed text-on-surface-variant opacity-80">
+                Alur ini memastikan pemahaman terstruktur. Node tujuan tetap terkunci hingga node asal dinyatakan selesai dan lulus Forge Test.
               </p>
             </div>
-            <div className="rounded-xl border border-outline-variant p-4 space-y-2">
-              <div className="text-xs font-bold uppercase tracking-[0.08em] text-on-variant">Topik Asal</div>
-              <div className="text-sm font-semibold">
-                {nodes.find(n => n.id === edges.find(e => e.id === selectedEdgeId)?.source)?.data.title ?? "Unknown Node"}
+            
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-outline-variant bg-white/50 p-6 shadow-sm">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant opacity-60 block mb-2">Node Prasyarat</span>
+                <div className="text-lg font-black tracking-tight text-on-surface">
+                  {nodes.find(n => n.id === edges.find(e => e.id === selectedEdgeId)?.source)?.data.title ?? "Unknown Node"}
+                </div>
               </div>
-              <div className="text-xs font-bold uppercase tracking-[0.08em] text-on-variant mt-3">Topik Tujuan</div>
-              <div className="text-sm font-semibold">
-                {nodes.find(n => n.id === edges.find(e => e.id === selectedEdgeId)?.target)?.data.title ?? "Unknown Node"}
+              
+              <div className="flex justify-center">
+                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary/10 text-secondary">
+                    <Sparkles size={20} />
+                 </div>
+              </div>
+
+              <div className="rounded-2xl border border-outline-variant bg-white/50 p-6 shadow-sm">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant opacity-60 block mb-2">Node Terkunci</span>
+                <div className="text-lg font-black tracking-tight text-on-surface">
+                  {nodes.find(n => n.id === edges.find(e => e.id === selectedEdgeId)?.target)?.data.title ?? "Unknown Node"}
+                </div>
               </div>
             </div>
+
             <button
               onClick={deleteSelectedEdge}
-              className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-red-200 px-3 py-3 text-sm font-bold text-red-600 hover:bg-red-50"
+              className="flex w-full h-14 items-center justify-center gap-3 rounded-full border border-error/20 bg-error/5 text-sm font-black uppercase tracking-widest text-error transition-all hover:bg-error/10 active:scale-95"
             >
-              <Trash2 size={16} /> Lepas Koneksi
+              <Trash2 size={18} /> Putus Koneksi
             </button>
           </div>
         </aside>
       )}
 
       {roadmapModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-6">
-          <section className="w-full max-w-lg rounded-2xl border border-outline-variant bg-white p-6 shadow-ambient">
-            <div className="mb-5 flex items-start justify-between">
-              <div>
-                <div className="mb-2 flex items-center gap-2 font-geist text-xs font-bold uppercase tracking-[0.08em] text-primary">
-                  <GitBranch size={15} /> Roadmap Baru
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-primary-container/40 p-4 sm:p-6 backdrop-blur-sm">
+          <section className="glass-card w-full max-w-md rounded-[28px] p-6 shadow-2xl">
+            <div className="mb-6 flex items-start justify-between">
+              <div className="flex flex-col gap-2">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-secondary/10 text-secondary">
+                  <Plus size={24} />
                 </div>
-                <h3 className="text-xl font-bold">Buat Learning Roadmap</h3>
-                <p className="mt-1 text-sm text-on-variant">Mulai dari satu workspace kosong, lalu isi node manual atau generate dengan AI.</p>
+                <h3 className="text-2xl font-black tracking-tight text-on-surface">Buat Roadmap Baru</h3>
+                <p className="text-sm font-medium text-on-surface-variant opacity-80">Rancang jalur belajar barumu dengan struktur yang jelas.</p>
               </div>
-              <button onClick={() => setRoadmapModalOpen(false)} className="rounded-lg p-2 hover:bg-surface-low">
-                <X size={18} />
+              <button onClick={() => setRoadmapModalOpen(false)} className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-container-low text-on-surface-variant hover:bg-secondary hover:text-white transition-all">
+                <X size={20} />
               </button>
             </div>
             <div className="space-y-4">
               <label className="block">
-                <span className="font-geist text-xs font-bold uppercase tracking-[0.08em] text-on-variant">Judul roadmap</span>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant opacity-60">Judul Roadmap</span>
                 <input
                   value={roadmapTitle}
                   onChange={(event) => setRoadmapTitle(event.target.value)}
-                  onKeyDown={(event) => event.key === "Enter" && addRoadmap()}
-                  className="mt-2 w-full rounded-lg border border-outline-variant px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary-container/20"
-                  placeholder="Backend Node.js Mastery"
+                  onKeyDown={(event) => event.key === "Enter" && roadmapTitle.trim() && addRoadmap()}
+                  className="mt-2 w-full rounded-2xl border border-outline-variant bg-white/50 px-5 py-4 text-sm font-bold outline-none transition-all focus:border-secondary focus:ring-4 focus:ring-secondary/10"
+                  placeholder="Misal: Belajar Bahasa Jepang"
                   autoFocus
                 />
               </label>
               <label className="block">
-                <span className="font-geist text-xs font-bold uppercase tracking-[0.08em] text-on-variant">Deskripsi opsional</span>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant opacity-60">Deskripsi (Opsional)</span>
                 <textarea
                   value={roadmapDescription}
                   onChange={(event) => setRoadmapDescription(event.target.value)}
-                  className="mt-2 min-h-24 w-full rounded-lg border border-outline-variant px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary-container/20"
+                  className="mt-2 min-h-24 w-full rounded-2xl border border-outline-variant bg-white/50 px-5 py-4 text-sm font-medium outline-none transition-all focus:border-secondary focus:ring-4 focus:ring-secondary/10 resize-none"
                   placeholder="Tujuan, batasan, atau konteks belajar..."
                 />
               </label>
             </div>
-            <div className="mt-6 flex justify-end gap-2">
-              <button onClick={() => setRoadmapModalOpen(false)} className="rounded-lg border border-outline-variant px-4 py-2 text-sm font-semibold">
+            <div className="mt-7 flex gap-3">
+              <button onClick={() => setRoadmapModalOpen(false)} className="h-12 flex-1 rounded-full border border-outline-variant px-6 text-sm font-bold text-on-surface-variant hover:bg-surface-container-low transition-all">
                 Batal
               </button>
               <button
                 onClick={addRoadmap}
                 disabled={!roadmapTitle.trim()}
-                className="rounded-lg bg-primary-container px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-300"
+                className="h-12 flex-1 rounded-full bg-secondary px-6 text-sm font-black uppercase tracking-widest text-white shadow-secondary-glow transition-all hover:bg-secondary/90 active:scale-95 disabled:cursor-not-allowed disabled:bg-surface-dim disabled:text-on-surface-variant disabled:shadow-none"
               >
-                Buat Roadmap
+                Buat Sekarang
               </button>
             </div>
           </section>
@@ -1647,25 +1751,23 @@ export default function FoundryDashboard() {
       )}
 
       {deleteRoadmapId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-6">
-          <section className="w-full max-w-md rounded-2xl border border-outline-variant bg-white p-6 shadow-ambient">
-            <div className="mb-5 flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600">
-                <Trash2 size={20} />
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-error-container/40 p-4 sm:p-6 backdrop-blur-sm">
+          <section className="glass-card w-full max-w-sm rounded-[28px] p-6 text-center shadow-2xl">
+            <div className="mb-6 flex flex-col items-center">
+              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-error/10 text-error">
+                <Trash2 size={32} />
               </div>
-              <div>
-                <h3 className="text-xl font-bold">Hapus Roadmap?</h3>
-                <p className="mt-1 text-sm leading-6 text-on-variant">
-                  Roadmap "{roadmaps.find((roadmap) => roadmap.id === deleteRoadmapId)?.title}" beserta node dan dependency-nya akan dihapus.
-                </p>
-              </div>
+              <h3 className="text-2xl font-black tracking-tight text-on-surface">Hapus Roadmap?</h3>
+              <p className="mt-3 text-sm font-medium leading-relaxed text-on-surface-variant">
+                Roadmap <strong className="text-on-surface">&quot;{roadmaps.find((r) => r.id === deleteRoadmapId)?.title}&quot;</strong> akan dihapus permanen beserta seluruh node didalamnya.
+              </p>
             </div>
-            <div className="flex justify-end gap-2">
-              <button type="button" onClick={() => setDeleteRoadmapId(null)} className="rounded-lg border border-outline-variant px-4 py-2 text-sm font-semibold">
+            <div className="flex gap-3">
+              <button type="button" onClick={() => setDeleteRoadmapId(null)} className="h-12 flex-1 rounded-full border border-outline-variant px-6 text-sm font-bold text-on-surface-variant hover:bg-surface-container-low transition-all">
                 Batal
               </button>
-              <button type="button" onClick={deleteRoadmap} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white">
-                Hapus
+              <button type="button" onClick={deleteRoadmap} className="h-12 flex-1 rounded-full bg-error px-6 text-sm font-black uppercase tracking-widest text-white shadow-lg shadow-error/20 hover:bg-error/90 active:scale-95">
+                Ya, Hapus
               </button>
             </div>
           </section>
@@ -1673,56 +1775,56 @@ export default function FoundryDashboard() {
       )}
 
       {nodeModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-6">
-          <section className="w-full max-w-lg rounded-2xl border border-outline-variant bg-white p-6 shadow-ambient">
-            <div className="mb-5 flex items-start justify-between">
-              <div>
-                <div className="mb-2 flex items-center gap-2 font-geist text-xs font-bold uppercase tracking-[0.08em] text-primary">
-                  <Plus size={15} /> Add Node
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-primary-container/40 p-4 sm:p-6 backdrop-blur-sm">
+          <section className="glass-card w-full max-w-md rounded-[28px] p-6 shadow-2xl">
+            <div className="mb-6 flex items-start justify-between">
+              <div className="flex flex-col gap-2">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-secondary/10 text-secondary">
+                  <Plus size={24} />
                 </div>
-                <h3 className="text-xl font-bold">Tambah Topik Manual</h3>
-                <p className="mt-1 text-sm text-on-variant">Node akan muncul di canvas dan bisa langsung kamu drag atau hubungkan.</p>
+                <h3 className="text-2xl font-black tracking-tight text-on-surface">Tambah Topik Manual</h3>
+                <p className="text-sm font-medium text-on-surface-variant opacity-80">Node akan muncul di canvas, siap untuk dihubungkan.</p>
               </div>
-              <button onClick={() => setNodeModalOpen(false)} className="rounded-lg p-2 hover:bg-surface-low">
-                <X size={18} />
+              <button onClick={() => setNodeModalOpen(false)} className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-container-low text-on-surface-variant hover:bg-secondary hover:text-white transition-all">
+                <X size={20} />
               </button>
             </div>
             <div className="space-y-4">
               <label className="block">
-                <span className="font-geist text-xs font-bold uppercase tracking-[0.08em] text-on-variant">Topik node</span>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant opacity-60">Topik Node</span>
                 <input
                   value={nodeTitle}
                   onChange={(event) => setNodeTitle(event.target.value)}
                   onKeyDown={(event) => event.key === "Enter" && addManualNode()}
-                  className="mt-2 w-full rounded-lg border border-outline-variant px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary-container/20"
-                  placeholder="Async/Await"
+                  className="mt-2 w-full rounded-2xl border border-outline-variant bg-white/50 px-5 py-4 text-sm font-bold outline-none transition-all focus:border-secondary focus:ring-4 focus:ring-secondary/10"
+                  placeholder="Misal: State Management"
                   autoFocus
                 />
               </label>
               <label className="block">
-                <span className="font-geist text-xs font-bold uppercase tracking-[0.08em] text-on-variant">Deskripsi singkat</span>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant opacity-60">Deskripsi Singkat</span>
                 <textarea
                   value={nodeDescription}
                   onChange={(event) => setNodeDescription(event.target.value)}
-                  className="mt-2 min-h-20 w-full rounded-lg border border-outline-variant px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary-container/20"
-                  placeholder="Konsep yang perlu dipahami di node ini..."
+                  className="mt-2 min-h-20 w-full rounded-2xl border border-outline-variant bg-white/50 px-5 py-4 text-sm font-medium outline-none transition-all focus:border-secondary focus:ring-4 focus:ring-secondary/10 resize-none"
+                  placeholder="Konsep utama yang perlu dipahami..."
                 />
               </label>
               <label className="block">
-                <span className="font-geist text-xs font-bold uppercase tracking-[0.08em] text-on-variant">Daftar Task (Opsional, satu per baris)</span>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant opacity-60">Daftar Task (Opsional, satu per baris)</span>
                 <textarea
                   value={nodeTasksText}
                   onChange={(event) => setNodeTasksText(event.target.value)}
-                  className="mt-2 min-h-24 w-full resize-none rounded-lg border border-outline-variant px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary-container/20"
+                  className="mt-2 min-h-32 w-full rounded-2xl border border-outline-variant bg-white/50 px-5 py-4 text-sm font-medium outline-none transition-all focus:border-secondary focus:ring-4 focus:ring-secondary/10 resize-none"
                   placeholder="Contoh:&#10;Pelajari konsep dasar&#10;Buat latihan mini project&#10;Review pemahaman teori"
                 />
               </label>
             </div>
-            <div className="mt-6 flex justify-end gap-2">
-              <button onClick={() => setNodeModalOpen(false)} className="rounded-lg border border-outline-variant px-4 py-2 text-sm font-semibold">
+            <div className="mt-10 flex gap-3">
+              <button onClick={() => setNodeModalOpen(false)} className="h-12 flex-1 rounded-full border border-outline-variant px-6 text-sm font-bold text-on-surface-variant hover:bg-surface-container-low transition-all">
                 Batal
               </button>
-              <button onClick={addManualNode} disabled={!nodeTitle.trim()} className="rounded-lg bg-primary-container px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-300">
+              <button onClick={addManualNode} disabled={!nodeTitle.trim()} className="h-12 flex-1 rounded-full bg-secondary px-6 text-sm font-black uppercase tracking-widest text-white shadow-secondary-glow transition-all hover:bg-secondary/90 active:scale-95 disabled:cursor-not-allowed disabled:bg-surface-dim disabled:text-on-surface-variant disabled:shadow-none">
                 Tambah Node
               </button>
             </div>
@@ -1731,18 +1833,26 @@ export default function FoundryDashboard() {
       )}
 
       {draftOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4 sm:p-6">
-          <section className="flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-outline-variant bg-white shadow-ambient">
-            <div className="border-b border-outline-variant p-5 pb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-primary-container/40 p-3 sm:p-6 backdrop-blur-sm">
+          <section className="glass-card flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-[24px] shadow-2xl">
+            <div className="border-b border-outline-variant/50 bg-white/50 p-4 sm:p-5 backdrop-blur-md">
               <div className="flex items-start justify-between gap-4">
-              <div>
-                <h3 className="text-xl font-bold">AI Generate Path</h3>
-                <p className="text-sm text-on-variant">Groq AI akan menyusun draft node dan dependency sesuai goal belajar kamu.</p>
+                <div className="flex flex-col gap-2">
+                   <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-secondary/10 text-secondary">
+                      <Sparkles size={20} />
+                   </div>
+                   <h3 className="text-xl font-black tracking-tight text-on-surface">AI Generate Path</h3>
+                   <p className="text-xs font-medium text-on-surface-variant opacity-80">Groq AI akan merancang roadmap belajar berdasarkan goal kamu.</p>
+                </div>
+                <button type="button" onClick={() => setDraftOpen(false)} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface-container-low text-on-surface-variant hover:bg-secondary hover:text-white transition-all"><X size={20} /></button>
               </div>
-              <button type="button" onClick={() => setDraftOpen(false)} className="rounded-lg p-2 hover:bg-surface-low"><X size={18} /></button>
+              
+              <div className="mt-4">
+                 <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant opacity-60 ml-2 block mb-2">Apa Goal Belajarmu?</span>
+                 <textarea value={goal} onChange={(event) => setGoal(event.target.value)} className="min-h-[76px] w-full resize-none rounded-[18px] border border-secondary/20 bg-white px-4 py-3 text-sm font-medium outline-none transition-all focus:border-secondary focus:ring-4 focus:ring-secondary/10 shadow-sm" placeholder="Contoh: Saya ingin belajar machine learning dari nol." />
               </div>
-              <textarea value={goal} onChange={(event) => setGoal(event.target.value)} className="mt-4 min-h-24 w-full resize-none rounded-lg border border-outline-variant p-3 text-sm outline-none focus:ring-2 focus:ring-primary-container/20" placeholder="Contoh: Mau ngerti backend Node.js dari fundamental sampai production" />
-              <div className="mt-3 flex items-center justify-between gap-3">
+
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 px-1">
                 <button
                   type="button"
                   onClick={(event) => {
@@ -1750,117 +1860,134 @@ export default function FoundryDashboard() {
                     void requestDraft();
                   }}
                   disabled={draftLoading || !goal.trim()}
-                  className="inline-flex items-center gap-2 rounded-lg border border-outline-variant px-3 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                  className="flex h-10 items-center gap-2 rounded-full border border-secondary/30 bg-secondary/5 px-5 text-xs font-black uppercase tracking-widest text-secondary transition-all hover:bg-secondary/10 active:scale-95 disabled:cursor-not-allowed disabled:border-outline-variant disabled:bg-surface-dim disabled:text-on-surface-variant"
                 >
-                  <Sparkles size={16} /> {draftLoading ? "Generating..." : "Generate Preview"}
+                  <Sparkles size={18} /> {draftLoading ? "Generating..." : "Generate Preview"}
                 </button>
                 {draftNodes.length > 0 && (
-                  <span className="font-geist text-xs font-semibold uppercase tracking-[0.08em] text-on-variant">
-                    {draftNodes.length} nodes
+                  <span className="rounded-full bg-secondary px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-white shadow-sm">
+                    {draftNodes.length} Nodes Generated
                   </span>
                 )}
               </div>
-              {draftError && <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">{draftError}</div>}
+              {draftError && <div className="mt-4 rounded-xl border border-error/20 bg-error/5 p-4 text-sm font-bold text-error">{draftError}</div>}
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+            <div className="custom-scrollbar min-h-[220px] flex-1 overflow-y-auto bg-surface-container-lowest/40 px-4 py-4 sm:px-5">
               {!draftNodes.length && (
-                <div className="rounded-xl border border-dashed border-outline-variant bg-surface-low p-4 text-sm leading-6 text-on-variant">
-                  Tulis goal belajar lalu klik Generate Preview untuk melihat draft node.
+                <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-outline-variant p-10 text-center">
+                  <div className="mb-4 text-on-surface-variant opacity-40"><Sparkles size={32} /></div>
+                  <p className="text-sm font-bold text-on-surface-variant opacity-60 uppercase tracking-widest">Tulis goal belajar lalu klik Generate Preview</p>
                 </div>
               )}
-              <div className="space-y-2">
+              <div className="space-y-2.5">
                 {draftNodes.map((item, index) => (
-                  <div key={item.id} className="grid grid-cols-[32px_1fr] gap-3 rounded-xl border border-outline-variant bg-white p-3">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-container/10 text-primary">
-                      <GitBranch size={16} />
+                  <div key={item.id} className="group flex gap-3 rounded-[18px] border border-outline-variant bg-white p-3 shadow-ambient transition-all hover:-translate-y-0.5 hover:border-secondary/30">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-black text-white shadow-sm">
+                      {index + 1}
                     </div>
-                    <div className="min-w-0">
-                      <div className="flex items-start justify-between gap-3">
-                        <span className="font-semibold leading-6">{index + 1}. {item.title}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="mb-1 flex flex-wrap items-start justify-between gap-2">
+                        <span className="text-sm font-black tracking-tight text-on-surface">{item.title}</span>
                         {item.dependencies.length > 0 && (
-                          <span className="shrink-0 rounded-full bg-surface-low px-2 py-1 font-geist text-[10px] font-semibold uppercase tracking-[0.08em] text-on-variant">
-                            {item.dependencies.length} deps
+                          <span className="shrink-0 rounded-full border border-outline-variant bg-surface-container-low px-2 py-1 text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">
+                            {item.dependencies.length} Prasyarat
                           </span>
                         )}
                       </div>
-                      <p className="mt-1 text-sm leading-6 text-on-variant">{item.description}</p>
+                      <p className="text-xs font-medium leading-5 text-on-surface-variant">{item.description}</p>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className="border-t border-outline-variant bg-white p-5">
-            <button
-              type="button"
-              onClick={(event) => {
-                event.preventDefault();
-                void confirmDraft();
-              }}
-              className="mt-5 w-full rounded-lg bg-primary-container px-4 py-3 text-sm font-bold text-white"
-            >
-              Confirm Draft ke Canvas
-            </button>
+            <div className="sticky bottom-0 border-t border-outline-variant/50 bg-white/80 p-4 backdrop-blur-md">
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.preventDefault();
+                  void confirmDraft();
+                }}
+                disabled={draftNodes.length === 0}
+                className="flex h-12 w-full items-center justify-center rounded-full bg-secondary text-xs font-black uppercase tracking-widest text-white shadow-secondary-glow transition-all hover:bg-secondary/90 active:scale-95 disabled:cursor-not-allowed disabled:bg-surface-dim disabled:text-on-surface-variant disabled:shadow-none"
+              >
+                Confirm Draft ke Canvas
+              </button>
             </div>
           </section>
         </div>
+
       )}
 
       {testOpen && selectedNode && (
-        <div className="fixed inset-0 z-50 overflow-auto bg-slate-950/50 p-6">
-          <section className="mx-auto max-w-4xl rounded-2xl bg-white p-6 shadow-ambient">
-            <div className="mb-5 flex items-start justify-between">
-              <div>
-                <h3 className="text-xl font-bold">Forge Case Study: {selectedNode.data.title}</h3>
-                <p className="text-sm text-on-variant">
-                  {evaluation ? `Skor: ${evaluation.score}/100 - ${evaluation.passed ? "Lulus" : "Belum lulus"}` : "Passing score 70%. Kirimkan jawaban/solusi Anda sesuai instruksi studi kasus di atas untuk dinilai oleh AI."}
+        <div className="fixed inset-0 z-[60] flex items-center justify-center overflow-auto bg-primary-container/40 p-4 sm:p-6 backdrop-blur-sm">
+          <section className="glass-card mx-auto w-full max-w-5xl rounded-[32px] p-8 shadow-2xl my-auto">
+            <div className="mb-8 flex items-start justify-between">
+              <div className="flex flex-col gap-2">
+                <h3 className="text-2xl font-black tracking-tight text-on-surface">Forge Gateway: {selectedNode.data.title}</h3>
+                <p className="text-sm font-medium text-on-surface-variant opacity-80">
+                  {evaluation ? `Skor: ${evaluation.score}/100 - ${evaluation.passed ? "Lulus" : "Belum lulus"}` : "Passing score 70%. Kirimkan jawaban/solusi Anda sesuai instruksi studi kasus di bawah."}
                 </p>
-                <p className={clsx("mt-1 text-xs font-semibold", forgeExpired(selectedNode) ? "text-red-600" : "text-on-variant")}>
-                  Deadline: {formatForgeDeadline(selectedNode.data.forgeExpiresAt)}
-                </p>
+                <div className={clsx("inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-widest w-fit", forgeExpired(selectedNode) ? "bg-error/10 text-error" : "bg-secondary/10 text-secondary")}>
+                  <CalendarClock size={14} /> Deadline: {formatForgeDeadline(selectedNode.data.forgeExpiresAt)}
+                </div>
               </div>
-              <button onClick={closeTestReview} className="rounded-lg p-2 hover:bg-surface-low"><X size={18} /></button>
+              <button onClick={closeTestReview} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface-container-low text-on-surface-variant hover:bg-secondary hover:text-white transition-all"><X size={20} /></button>
             </div>
 
-            {testLoading && !caseStudy && <div className="rounded-xl border border-outline-variant bg-surface-low p-4 text-sm text-on-variant">Sedang membuat studi kasus sesuai task node...</div>}
-            {!testLoading && !caseStudy && <div className="rounded-xl border border-outline-variant bg-surface-low p-4 text-sm text-on-variant">Studi kasus belum tersedia. Tutup modal lalu mulai lagi.</div>}
+            {testLoading && !caseStudy && (
+              <div className="flex flex-col items-center justify-center rounded-[24px] border border-secondary/20 bg-white/50 p-12 text-center shadow-sm">
+                <div className="h-10 w-10 animate-spin rounded-full border-4 border-secondary/30 border-t-secondary mb-4" />
+                <p className="text-sm font-black uppercase tracking-widest text-secondary">Generating Case Study...</p>
+              </div>
+            )}
+            
+            {!testLoading && !caseStudy && (
+              <div className="rounded-[24px] border border-dashed border-outline-variant bg-white/30 p-8 text-center">
+                <p className="text-sm font-bold text-on-surface-variant opacity-60 uppercase tracking-widest">Studi kasus belum tersedia. Tutup modal lalu mulai lagi.</p>
+              </div>
+            )}
 
             {caseStudy && (
-              <div className="grid gap-5 lg:grid-cols-[0.92fr_1.08fr]">
-                <div className="space-y-4">
+              <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
+                <div className="space-y-6">
                   {forgeExpired(selectedNode) && (
-                    <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-700">
+                    <div className="rounded-[20px] border border-error/20 bg-error/5 p-6 text-sm font-bold leading-relaxed text-error shadow-sm">
                       Case ini sudah expired karena melewati batas 24 jam. Tutup modal lalu mulai Forge lagi untuk membuat studi kasus baru.
                     </div>
                   )}
-                  <div className="rounded-xl border border-outline-variant bg-surface-low p-4">
-                    <h4 className="text-lg font-bold">{caseStudy.title}</h4>
-                    <p className="mt-2 text-sm leading-6 text-on-variant">{caseStudy.scenario}</p>
+                  
+                  <div className="rounded-[24px] border border-secondary/10 bg-secondary/5 p-6 shadow-sm">
+                    <h4 className="text-lg font-black tracking-tight text-secondary">{caseStudy.title}</h4>
+                    <p className="mt-3 text-sm font-medium leading-relaxed text-on-surface-variant">{caseStudy.scenario}</p>
                   </div>
-                  <div className="rounded-xl border border-outline-variant p-4">
-                    <p className="mb-3 font-semibold">Requirement</p>
-                    <ul className="space-y-2 text-sm leading-6 text-on-variant">
+                  
+                  <div className="rounded-[24px] border border-outline-variant/50 bg-white/50 p-6 shadow-sm">
+                    <p className="mb-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant opacity-60">Requirements</p>
+                    <ul className="space-y-3 text-sm font-medium leading-relaxed text-on-surface">
                       {caseStudy.requirements.map((item) => (
-                        <li key={item} className="flex gap-2">
-                          <CheckCircle2 className="mt-1 shrink-0 text-emerald-600" size={15} />
+                        <li key={item} className="flex gap-3">
+                          <CheckCircle2 className="shrink-0 text-emerald-500" size={18} />
                           <span>{item}</span>
                         </li>
                       ))}
                     </ul>
                   </div>
+                  
                   {caseStudy.expectedOutput && (
-                    <div className="rounded-xl border border-outline-variant p-4">
-                      <p className="mb-2 font-semibold">Expected Output</p>
-                      <p className="text-sm leading-6 text-on-variant">{caseStudy.expectedOutput}</p>
+                    <div className="rounded-[24px] border border-outline-variant/50 bg-white/50 p-6 shadow-sm">
+                      <p className="mb-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant opacity-60">Expected Output</p>
+                      <p className="text-sm font-medium leading-relaxed text-on-surface">{caseStudy.expectedOutput}</p>
                     </div>
                   )}
-                  <div className="rounded-xl border border-outline-variant p-4">
-                    <p className="mb-3 font-semibold">Dinilai dari</p>
-                    <ul className="space-y-2 text-sm leading-6 text-on-variant">
+                  
+                  <div className="rounded-[24px] border border-outline-variant/50 bg-white/50 p-6 shadow-sm">
+                    <p className="mb-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant opacity-60">Evaluation Criteria</p>
+                    <ul className="space-y-3 text-sm font-medium leading-relaxed text-on-surface">
                       {caseStudy.evaluationCriteria.map((item) => (
-                        <li key={item} className="flex gap-2">
-                          <Circle className="mt-1 shrink-0 text-primary" size={14} />
+                        <li key={item} className="flex gap-3">
+                          <div className="mt-1 h-2 w-2 rounded-full bg-secondary shrink-0" />
                           <span>{item}</span>
                         </li>
                       ))}
@@ -1868,65 +1995,69 @@ export default function FoundryDashboard() {
                   </div>
                 </div>
 
-                <div className="space-y-4">
-                  <label className="block">
-                    <span className="font-geist text-xs font-bold uppercase tracking-[0.08em] text-on-variant">Jawaban / Solusi Studi Kasus</span>
+                <div className="space-y-6 flex flex-col h-full">
+                  <label className="block flex-1 flex flex-col">
+                    <span className="mb-3 text-[10px] font-black uppercase tracking-widest text-on-surface-variant opacity-60">Jawaban / Solusi Studi Kasus</span>
                     <textarea
                       value={submission}
                       onChange={(event) => setSubmission(event.target.value)}
                       spellCheck={false}
-                      className="mt-2 min-h-[320px] w-full resize-y rounded-xl border border-outline-variant bg-slate-50 p-4 text-sm leading-6 text-on-surface outline-none focus:ring-2 focus:ring-primary-container/30"
+                      className="flex-1 w-full resize-none rounded-[24px] border border-outline-variant bg-white/80 p-6 text-sm font-medium leading-relaxed text-on-surface outline-none transition-all focus:border-secondary focus:ring-4 focus:ring-secondary/10 shadow-inner custom-scrollbar"
                       placeholder={`Tulis atau tempel jawaban Anda di sini...\n(Bisa berupa penjelasan konsep, analisis studi kasus, kode program, atau format lain sesuai instruksi tugas)`}
                     />
                   </label>
 
                   {evaluation && (
-                    <div className={`rounded-xl border-2 p-4 ${evaluation.passed ? "border-emerald-300 bg-emerald-50" : "border-red-300 bg-red-50"}`}>
-                      <div className="flex items-start gap-3">
-                        {evaluation.passed ? <CheckCircle2 className="mt-1 shrink-0 text-emerald-600" size={22} /> : <AlertTriangle className="mt-1 shrink-0 text-red-500" size={22} />}
+                    <div className={`rounded-[24px] border-2 p-6 shadow-sm ${evaluation.passed ? "border-emerald-400 bg-emerald-50/80" : "border-error/30 bg-error/5"}`}>
+                      <div className="flex items-start gap-4">
+                        <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${evaluation.passed ? "bg-emerald-100 text-emerald-600" : "bg-error/10 text-error"}`}>
+                           {evaluation.passed ? <CheckCircle2 size={24} /> : <AlertTriangle size={24} />}
+                        </div>
                         <div>
-                          <p className="font-bold" style={{ color: evaluation.passed ? "#059669" : "#dc2626" }}>
-                            {evaluation.passed ? "Lulus, bisa lanjut" : "Belum cocok untuk lanjut"} - {evaluation.score}/100
+                          <p className={`text-lg font-black tracking-tight ${evaluation.passed ? "text-emerald-700" : "text-error"}`}>
+                            {evaluation.passed ? "Lulus, Bisa Lanjut" : "Belum Memenuhi Syarat"} — {evaluation.score}/100
                           </p>
-                          <p className="mt-1 text-sm leading-6 text-on-variant">{evaluation.feedback}</p>
+                          <p className="mt-2 text-sm font-medium leading-relaxed text-on-surface-variant">{evaluation.feedback}</p>
                         </div>
                       </div>
+                      
                       {evaluation.issues.length > 0 && (
-                        <div className="mt-4">
-                          <p className="text-sm font-semibold">Yang perlu diperbaiki</p>
-                          <ul className="mt-2 space-y-1 text-sm leading-6 text-on-variant">
-                            {evaluation.issues.map((issue) => <li key={issue}>- {issue}</li>)}
+                        <div className="mt-6 border-t border-black/5 pt-4">
+                          <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant opacity-60 mb-3">Area Perbaikan</p>
+                          <ul className="space-y-2 text-sm font-medium leading-relaxed text-on-surface">
+                            {evaluation.issues.map((issue) => <li key={issue} className="flex gap-2"><div className="mt-2 h-1.5 w-1.5 rounded-full bg-error shrink-0" /><span>{issue}</span></li>)}
                           </ul>
                         </div>
                       )}
+                      
                       {evaluation.nextSteps.length > 0 && (
                         <div className="mt-4">
-                          <p className="text-sm font-semibold">Langkah berikutnya</p>
-                          <ul className="mt-2 space-y-1 text-sm leading-6 text-on-variant">
-                            {evaluation.nextSteps.map((step) => <li key={step}>- {step}</li>)}
+                          <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant opacity-60 mb-3">Langkah Berikutnya</p>
+                          <ul className="space-y-2 text-sm font-medium leading-relaxed text-on-surface">
+                            {evaluation.nextSteps.map((step) => <li key={step} className="flex gap-2"><div className="mt-2 h-1.5 w-1.5 rounded-full bg-secondary shrink-0" /><span>{step}</span></li>)}
                           </ul>
                         </div>
                       )}
                     </div>
                   )}
 
-                  <div className="flex gap-3">
+                  <div className="flex gap-3 mt-auto pt-2">
                     {evaluation ? (
                       evaluation.passed ? (
-                        <button disabled className="flex-1 rounded-lg bg-emerald-100 px-4 py-3 text-sm font-bold text-emerald-700">
+                        <button disabled className="h-14 flex-1 rounded-full bg-emerald-100 px-6 text-sm font-black uppercase tracking-widest text-emerald-700 opacity-80 cursor-not-allowed">
                           Sudah Lulus
                         </button>
                       ) : (
-                        <button onClick={() => void retryForgeTest()} disabled={testLoading} className="flex-1 rounded-lg bg-primary-container px-4 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-300">
+                        <button onClick={() => void retryForgeTest()} disabled={testLoading} className="h-14 flex-1 rounded-full bg-secondary px-6 text-sm font-black uppercase tracking-widest text-white shadow-secondary-glow transition-all hover:bg-secondary/90 active:scale-95 disabled:cursor-not-allowed disabled:bg-surface-dim disabled:text-on-surface-variant disabled:shadow-none">
                           {testLoading ? "Membuat Case Baru..." : "Test Ulang"}
                         </button>
                       )
                     ) : (
-                      <button onClick={() => void submitTest()} disabled={testLoading || !submission.trim() || forgeExpired(selectedNode)} className="flex-1 rounded-lg bg-primary-container px-4 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-300">
-                        {testLoading ? "Menilai Submission..." : "Submit untuk Dinilai"}
+                      <button onClick={() => void submitTest()} disabled={testLoading || !submission.trim() || forgeExpired(selectedNode)} className="h-14 flex-1 rounded-full bg-secondary px-6 text-sm font-black uppercase tracking-widest text-white shadow-secondary-glow transition-all hover:bg-secondary/90 active:scale-95 disabled:cursor-not-allowed disabled:bg-surface-dim disabled:text-on-surface-variant disabled:shadow-none">
+                        {testLoading ? "Menilai Submission..." : "Submit Evaluasi"}
                       </button>
                     )}
-                    <button onClick={closeTestReview} className="rounded-lg border border-outline-variant px-4 py-3 text-sm font-bold">
+                    <button onClick={closeTestReview} className="h-14 rounded-full border border-outline-variant px-8 text-sm font-bold text-on-surface-variant hover:bg-surface-container-low transition-all">
                       Tutup
                     </button>
                   </div>
