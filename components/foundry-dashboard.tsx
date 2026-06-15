@@ -9,9 +9,11 @@ import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import {
   Background,
   BackgroundVariant,
+  BaseEdge,
   Connection,
   Controls,
   Edge,
+  EdgeProps,
   Handle,
   MarkerType,
   MiniMap,
@@ -21,6 +23,8 @@ import {
   ReactFlow,
   addEdge,
   applyEdgeChanges,
+  getBezierPath,
+  useInternalNode,
   useEdgesState,
   useNodesState
 } from "@xyflow/react";
@@ -130,7 +134,7 @@ const makeEdge = (source: string, target: string): Edge => ({
   id: `${source}-${target}`,
   source,
   target,
-  type: "bezier",
+  type: "floating",
   animated: false,
   markerEnd: { type: MarkerType.ArrowClosed, color: "#8127cf" },
   style: { stroke: "#8127cf", strokeWidth: 2.25 }
@@ -534,7 +538,97 @@ function SkillCard({ data, selected }: NodeProps<SkillNode>) {
   );
 }
 
+type FloatingNodeBox = {
+  internals?: { positionAbsolute?: { x: number; y: number } };
+  positionAbsolute?: { x: number; y: number };
+  position?: { x: number; y: number };
+  measured?: { width?: number; height?: number };
+  width?: number;
+  height?: number;
+};
+
+function nodeBox(node: FloatingNodeBox) {
+  const position = node.internals?.positionAbsolute ?? node.positionAbsolute ?? node.position ?? { x: 0, y: 0 };
+  const width = node.measured?.width ?? node.width ?? 320;
+  const height = node.measured?.height ?? node.height ?? 190;
+  return {
+    x: position.x,
+    y: position.y,
+    width,
+    height,
+    centerX: position.x + width / 2,
+    centerY: position.y + height / 2
+  };
+}
+
+function nodeIntersection(fromNode: FloatingNodeBox, toNode: FloatingNodeBox) {
+  const from = nodeBox(fromNode);
+  const to = nodeBox(toNode);
+  const dx = to.centerX - from.centerX;
+  const dy = to.centerY - from.centerY;
+  const halfWidth = from.width / 2;
+  const halfHeight = from.height / 2;
+  const scale = 1 / (Math.abs(dx) / halfWidth + Math.abs(dy) / halfHeight || 1);
+
+  return {
+    x: from.centerX + dx * scale,
+    y: from.centerY + dy * scale,
+    centerX: from.centerX,
+    centerY: from.centerY
+  };
+}
+
+function edgePosition(point: { x: number; y: number; centerX: number; centerY: number }) {
+  const dx = point.x - point.centerX;
+  const dy = point.y - point.centerY;
+
+  if (Math.abs(dx) > Math.abs(dy)) {
+    return dx > 0 ? Position.Right : Position.Left;
+  }
+
+  return dy > 0 ? Position.Bottom : Position.Top;
+}
+
+function FloatingEdge({ id, source, target, markerEnd, style, animated }: EdgeProps) {
+  const sourceNode = useInternalNode(source);
+  const targetNode = useInternalNode(target);
+
+  if (!sourceNode || !targetNode) return null;
+
+  const sourcePoint = nodeIntersection(sourceNode, targetNode);
+  const targetPoint = nodeIntersection(targetNode, sourceNode);
+  const [path] = getBezierPath({
+    sourceX: sourcePoint.x,
+    sourceY: sourcePoint.y,
+    sourcePosition: edgePosition(sourcePoint),
+    targetX: targetPoint.x,
+    targetY: targetPoint.y,
+    targetPosition: edgePosition(targetPoint),
+    curvature: 0.28
+  });
+
+  return (
+    <>
+      <BaseEdge id={id} path={path} markerEnd={markerEnd} style={style} />
+      {animated && (
+        <path
+          d={path}
+          fill="none"
+          className="foundry-floating-edge-active"
+          style={{
+            stroke: style?.stroke ?? "#5B21B6",
+            strokeWidth: Number(style?.strokeWidth ?? 3) + 1,
+            strokeDasharray: "7 8",
+            pointerEvents: "none"
+          }}
+        />
+      )}
+    </>
+  );
+}
+
 const nodeTypes = { skill: SkillCard };
+const edgeTypes = { floating: FloatingEdge };
 
 export default function FoundryDashboard() {
   const router = useRouter();
@@ -689,7 +783,7 @@ export default function FoundryDashboard() {
         const selected = edge.id === selectedEdgeId;
         return {
           ...edge,
-          type: "bezier",
+          type: "floating",
           animated: selected,
           markerEnd: { type: MarkerType.ArrowClosed, color: selected ? "#5B21B6" : "#8127cf" },
           style: {
@@ -776,7 +870,7 @@ export default function FoundryDashboard() {
   const onConnect = useCallback(
     (connection: Connection) => {
       setEdges((items) => {
-        const next = addEdge({ ...connection, type: "bezier", animated: false, markerEnd: { type: MarkerType.ArrowClosed, color: "#7C3AED" }, style: { stroke: "#7C3AED", strokeWidth: 2.25 } }, items);
+        const next = addEdge({ ...connection, type: "floating", animated: false, markerEnd: { type: MarkerType.ArrowClosed, color: "#7C3AED" }, style: { stroke: "#7C3AED", strokeWidth: 2.25 } }, items);
         setNodes((nodeItems) => applyLocks(nodeItems, next));
         return next;
       });
@@ -1409,6 +1503,7 @@ export default function FoundryDashboard() {
               nodes={nodes}
               edges={visibleEdges}
               nodeTypes={nodeTypes}
+              edgeTypes={edgeTypes}
               onNodesChange={onNodesChange}
               onEdgesChange={onEdgesChange}
               onConnect={onConnect}

@@ -115,8 +115,19 @@
 .foundry-flow .react-flow__edge-path {
   stroke-linecap: round;
   stroke-width: 2.5;
-  stroke-dasharray: 8 8;
-  opacity: 0.58;
+  opacity: 0.62;
+}
+
+.foundry-flow .foundry-floating-edge-active {
+  animation: foundry-edge-dash 900ms linear infinite;
+  opacity: 0.72;
+  stroke-linecap: round;
+}
+
+@keyframes foundry-edge-dash {
+  to {
+    stroke-dashoffset: -30;
+  }
 }
 
 .foundry-flow .react-flow__controls {
