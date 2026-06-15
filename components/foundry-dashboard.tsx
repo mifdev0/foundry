@@ -38,7 +38,6 @@ import {
   Pencil,
   Plus,
   RefreshCcw,
-  Save,
   Send,
   Settings,
   Sparkles,
@@ -1477,12 +1476,12 @@ export default function FoundryDashboard() {
                     dangerouslySetInnerHTML={{ __html: selectedNode.data.notes }}
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-3 pt-4">
-                  <button onClick={deleteSelected} className="flex h-12 items-center justify-center gap-2 rounded-full border border-error/20 bg-error/5 text-sm font-bold text-error transition-all hover:bg-error/10">
+                <div className="space-y-3 pt-4">
+                  <p className="text-center text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/50">
+                    Perubahan tersimpan otomatis
+                  </p>
+                  <button onClick={deleteSelected} className="flex h-12 w-full items-center justify-center gap-2 rounded-full border border-error/20 bg-error/5 text-sm font-bold text-error transition-all hover:bg-error/10">
                     <Trash2 size={18} /> Delete Node
-                  </button>
-                  <button className="flex h-12 items-center justify-center gap-2 rounded-full bg-secondary text-sm font-bold text-white shadow-secondary-glow hover:bg-secondary/90">
-                    <Save size={18} /> Simpan
                   </button>
                 </div>
               </div>
