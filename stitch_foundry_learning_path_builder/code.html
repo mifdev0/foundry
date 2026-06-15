@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Foundry | SaaS Learning Path</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Geist:wght@400;500&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=Inter:wght@100..900&amp;display=swap" rel="stylesheet"/>
+<style>
+        body {
+            background-color: #F8F7FF;
+            font-family: 'Inter', sans-serif;
+        }
+        
+        .dot-grid {
+            position: absolute;
+            inset: 0;
+            background-image: radial-gradient(#ccc3d8 1px, transparent 1px);
+            background-size: 24px 24px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .blob-1 {
+            position: absolute;
+            top: -10%;
+            right: -5%;
+            width: 800px;
+            height: 800px;
+            background: radial-gradient(circle, #C4B5FD 0%, transparent 70%);
+            opacity: 0.35;
+            filter: blur(60px);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .blob-2 {
+            position: absolute;
+            bottom: -20%;
+            left: -10%;
+            width: 900px;
+            height: 900px;
+            background: radial-gradient(circle, #A78BFA 0%, transparent 70%);
+            opacity: 0.25;
+            filter: blur(80px);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .bezier-path {
+            stroke-dasharray: 8;
+            animation: dash 30s linear infinite;
+        }
+        @keyframes dash {
+            to { stroke-dashoffset: -1000; }
+        }
+        
+        /* Path Animation Dot */
+        .path-dot {
+            offset-path: path("M 380 180 C 450 180, 500 280, 580 280");
+            animation: moveDot 4s linear infinite;
+        }
+        
+        @keyframes moveDot {
+            0% { offset-distance: 0%; }
+            100% { offset-distance: 100%; }
+        }
+
+        .node-card {
+            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .node-card:hover {
+            transform: scale(1.02) translateY(-4px) rotate(1deg);
+        }
+        .glass-sidebar {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(12px);
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        
+        /* Floating Pills & Accents */
+        .floating-pill {
+            position: absolute;
+            padding: 4px 12px;
+            background: rgba(255, 255, 255, 0.6);
+            border: 1px solid rgba(196, 181, 253, 0.5);
+            backdrop-filter: blur(8px);
+            border-radius: 999px;
+            font-family: 'Geist', sans-serif;
+            font-size: 12px;
+            color: #630ed4;
+            font-weight: 500;
+            z-index: 5;
+            box-shadow: 0 4px 12px rgba(124, 58, 237, 0.05);
+            animation: float 6s ease-in-out infinite;
+        }
+        
+        .accent-shape {
+            position: absolute;
+            color: #C4B5FD;
+            opacity: 0.6;
+            z-index: 1;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0) rotate(var(--rot)); }
+            50% { transform: translateY(-10px) rotate(calc(var(--rot) + 2deg)); }
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-surface-variant": "#4a4455",
+                        "primary": "#630ed4",
+                        "surface-container": "#eaedff",
+                        "outline": "#7b7487",
+                        "background": "#F8F7FF",
+                        "surface-dim": "#d2d9f4",
+                        "on-background": "#131b2e",
+                        "on-surface": "#131b2e",
+                        "surface-container-low": "#f2f3ff",
+                        "surface-container-lowest": "#ffffff",
+                        "outline-variant": "#ccc3d8",
+                        "primary-container": "#7c3aed",
+                        "surface": "#F8F7FF"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "12px",
+                        "2xl": "16px",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "unit": "4px",
+                        "xl": "32px",
+                        "gutter": "24px",
+                        "sm": "8px",
+                        "md": "16px",
+                        "lg": "24px"
+                    },
+                    "fontFamily": {
+                        "body-md": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "label-md": ["Geist"]
+                    },
+                    "fontSize": {
+                        "label-sm": ["12px", {"lineHeight": "1.4", "letterSpacing": "0.04em", "fontWeight": "500"}],
+                        "body-md": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                        "label-md": ["14px", {"lineHeight": "1.4", "letterSpacing": "0.02em", "fontWeight": "500"}],
+                        "headline-md": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}]
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="text-on-surface overflow-hidden">
+<div class="flex h-screen w-full relative">
+<!-- SideNavBar -->
+<aside class="flex flex-col h-full py-md px-sm bg-surface-container-lowest dark:bg-surface-dim h-screen w-64 border-r border-outline-variant z-50">
+<div class="px-md py-lg mb-xl">
+<h1 class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed">Foundry</h1>
+<p class="font-body-md text-sm text-on-surface-variant">SaaS Learning Path</p>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="flex items-center px-md py-sm text-primary dark:text-primary-fixed font-bold bg-primary-container/10 rounded-lg transition-colors duration-200" href="#">
+<span class="material-symbols-outlined mr-3">home</span>
+<span class="font-body-md">Home</span>
+</a>
+<a class="flex items-center px-md py-sm text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-high hover:text-primary transition-colors duration-200" href="#">
+<span class="material-symbols-outlined mr-3">account_tree</span>
+<span class="font-body-md">My Roadmaps</span>
+</a>
+<a class="flex items-center px-md py-sm text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-high hover:text-primary transition-colors duration-200" href="#">
+<span class="material-symbols-outlined mr-3">group</span>
+<span class="font-body-md">Shared</span>
+</a>
+<a class="flex items-center px-md py-sm text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-high hover:text-primary transition-colors duration-200" href="#">
+<span class="material-symbols-outlined mr-3">dashboard_customize</span>
+<span class="font-body-md">Templates</span>
+</a>
+</nav>
+<div class="mt-auto pt-lg border-t border-outline-variant space-y-1">
+<a class="flex items-center px-md py-sm text-on-surface-variant hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined mr-3">settings</span>
+<span class="font-body-md">Settings</span>
+</a>
+<a class="flex items-center px-md py-sm text-on-surface-variant hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined mr-3">help</span>
+<span class="font-body-md">Support</span>
+</a>
+<button class="w-full mt-md bg-primary-container text-white font-bold py-3 px-lg rounded-full shadow-lg shadow-primary/20 hover:scale-[0.98] transition-transform">
+                    + New Roadmap
+                </button>
+</div>
+</aside>
+<main class="relative flex-1 overflow-auto bg-transparent p-xl">
+<!-- Dreamy Background Elements -->
+<div class="dot-grid"></div>
+<div class="blob-1"></div>
+<div class="blob-2"></div>
+<!-- Floating Elements -->
+<div class="floating-pill" style="top: 150px; left: 450px; --rot: -8deg;">#JavaScript</div>
+<div class="floating-pill" style="top: 380px; left: 880px; --rot: 12deg;">#API</div>
+<div class="floating-pill" style="top: 180px; left: 750px; --rot: 5deg;">#React</div>
+<div class="floating-pill" style="top: 500px; left: 300px; --rot: -15deg;">#Architecture</div>
+<!-- Geometric Accents -->
+<svg class="accent-shape" fill="none" height="16" style="top: 100px; left: 350px;" viewbox="0 0 16 16" width="16" xmlns="http://www.w3.org/2000/svg">
+<circle cx="8" cy="8" r="7.5" stroke="currentColor"></circle>
+</svg>
+<svg class="accent-shape" fill="none" height="16" style="top: 450px; left: 500px;" viewbox="0 0 16 16" width="16" xmlns="http://www.w3.org/2000/svg">
+<path d="M8 0V16M0 8H16" stroke="currentColor" stroke-width="2"></path>
+</svg>
+<svg class="accent-shape" fill="none" height="12" style="top: 250px; left: 950px;" viewbox="0 0 12 12" width="12" xmlns="http://www.w3.org/2000/svg">
+<circle cx="6" cy="6" fill="currentColor" r="6"></circle>
+</svg>
+<!-- Top Header (Contextual) -->
+<header class="flex justify-between items-center w-full mb-xl relative z-20">
+<div>
+<h2 class="font-headline-md text-headline-md font-bold text-on-surface">Software Architecture Mastery</h2>
+<p class="text-on-surface-variant font-body-md">Your progress is at 42% through this journey.</p>
+</div>
+<div class="flex items-center space-x-md">
+<div class="flex -space-x-2">
+<img alt="User Avatar" class="w-10 h-10 rounded-full border-2 border-white shadow-sm" data-alt="A clean, professional headshot of a smiling young male software engineer in a bright, modern office setting. The aesthetic is minimal with soft light and high-end tech-focused surroundings. The image uses the primary brand colors subtly in the background through office light reflections." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDtE0O4x0SDms-6jU9idYj_qRGvJdH2FL_Kbz6YD-aQs-kl0vqgFRUwXjg0eUUtD-2DL7D7OKYsxpXuF7PgQCuHTXClE7ccF9Swuajo1sCoNhwvBw-8As_2EssH2EabG4MIIHLNOBubCDPb5pcMzY4sp5KxJQx0-5qXw00rr-Y0jdb0wv7pzpf74bvv9BLyChDCCV-1ZXBXz87gdj7fR2McyOdMDHLDDFKkrx9zslKI840AuIQ20QmEMbGCjRJcnmY_5zFhf7mL57w3"/>
+<div class="w-10 h-10 rounded-full border-2 border-white bg-primary-container text-white flex items-center justify-center text-xs font-bold">+4</div>
+</div>
+<button class="p-sm rounded-full hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined text-on-surface-variant">notifications</span>
+</button>
+</div>
+</header>
+<!-- Canvas Area -->
+<div class="relative min-h-[1200px] w-full mt-12 z-10">
+<!-- SVG Connections Background -->
+<svg class="absolute top-0 left-0 w-full h-full pointer-events-none" style="z-index: 0;">
+<defs>
+<lineargradient id="activeGrad" x1="0%" x2="100%" y1="0%" y2="100%">
+<stop offset="0%" style="stop-color:#7C3AED;stop-opacity:1"></stop>
+<stop offset="100%" style="stop-color:#C084FC;stop-opacity:1"></stop>
+</lineargradient>
+<filter id="glow">
+<fegaussianblur result="coloredBlur" stddeviation="3"></fegaussianblur>
+<femerge>
+<femergenode in="coloredBlur"></femergenode>
+<femergenode in="SourceGraphic"></femergenode>
+</femerge>
+</filter>
+</defs>
+<!-- Path 1: Frontend -> React -->
+<path class="bezier-path" d="M 380 180 C 450 180, 500 280, 580 280" fill="none" filter="url(#glow)" stroke="url(#activeGrad)" stroke-width="3"></path>
+<!-- Path 2: React -> System Design -->
+<path d="M 880 320 C 950 320, 1000 450, 1100 450" fill="none" stroke="url(#activeGrad)" stroke-dasharray="8,8" stroke-width="2"></path>
+<!-- Animated Dot along Path 1 -->
+<circle class="path-dot" fill="#7C3AED" filter="url(#glow)" r="4"></circle>
+</svg>
+<!-- Skill Nodes -->
+<!-- Frontend Fundamentals (Completed) -->
+<div class="node-card absolute top-10 left-20 z-10 w-80 bg-surface-container-lowest p-lg rounded-2xl shadow-[0_10px_25px_-5px_rgba(0,0,0,0.08)] border border-emerald-200/60 -rotate-1">
+<div class="flex justify-between items-start mb-sm">
+<span class="px-sm py-xs bg-emerald-100 text-emerald-700 text-[10px] font-bold uppercase tracking-wider rounded-md">Completed</span>
+<span class="material-symbols-outlined text-emerald-600" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+<h3 class="font-headline-md text-lg font-bold mb-xs">Frontend Fundamentals</h3>
+<p class="text-sm text-on-surface-variant font-body-md mb-md">Mastering HTML5, CSS3, and the core JavaScript engine.</p>
+<div class="w-full h-1.5 bg-surface-container rounded-full overflow-hidden">
+<div class="h-full bg-emerald-500 w-full"></div>
+</div>
+<div class="flex justify-between mt-xs">
+<span class="text-[10px] font-bold text-on-surface-variant">100%</span>
+<span class="text-[10px] font-bold text-on-surface-variant">12/12 Lessons</span>
+</div>
+</div>
+<!-- Advanced React (In Progress) -->
+<div class="node-card absolute top-[220px] left-[550px] z-10 w-80 bg-surface-container-lowest p-lg rounded-2xl border-2 border-primary rotate-2" style="box-shadow: 0 0 20px 5px rgba(124, 58, 237, 0.3);">
+<div class="flex justify-between items-start mb-sm">
+<span class="px-sm py-xs bg-amber-100 text-amber-700 text-[10px] font-bold uppercase tracking-wider rounded-md">In Progress</span>
+<span class="material-symbols-outlined text-primary animate-pulse">keyboard_double_arrow_right</span>
+</div>
+<h3 class="font-headline-md text-lg font-bold mb-xs">Advanced React</h3>
+<p class="text-sm text-on-surface-variant font-body-md mb-md">Hooks, patterns, performance optimization, and server components.</p>
+<div class="w-full h-1.5 bg-surface-container rounded-full overflow-hidden">
+<div class="h-full bg-gradient-to-r from-primary to-[#C084FC] w-[42%]"></div>
+</div>
+<div class="flex justify-between mt-xs">
+<span class="text-[10px] font-bold text-primary">42%</span>
+<span class="text-[10px] font-bold text-on-surface-variant">8/19 Lessons</span>
+</div>
+<button class="mt-md w-full py-2 bg-primary-container/10 text-primary font-bold text-sm rounded-lg hover:bg-primary-container hover:text-white transition-colors">
+                        Continue Learning
+                    </button>
+</div>
+<!-- System Design (Locked) -->
+<div class="node-card absolute top-[400px] left-[1050px] z-10 w-80 bg-surface-container-lowest/60 p-lg rounded-2xl border border-outline-variant opacity-70 grayscale-[0.5] -rotate-2">
+<div class="flex justify-between items-start mb-sm">
+<span class="px-sm py-xs bg-surface-container-high text-on-surface-variant text-[10px] font-bold uppercase tracking-wider rounded-md">Locked</span>
+<span class="material-symbols-outlined text-on-surface-variant">lock</span>
+</div>
+<h3 class="font-headline-md text-lg font-bold mb-xs">System Design</h3>
+<p class="text-sm text-on-surface-variant font-body-md mb-md">Scalability, availability, and large scale distributed databases.</p>
+<div class="w-full h-1.5 bg-surface-container rounded-full overflow-hidden">
+<div class="h-full bg-outline-variant w-0"></div>
+</div>
+<div class="flex justify-between mt-xs">
+<span class="text-[10px] font-bold text-on-surface-variant">0%</span>
+<span class="text-[10px] font-bold text-on-surface-variant">Prerequisite: React</span>
+</div>
+</div>
+<!-- Subtle Decorative Elements -->
+<div class="absolute bottom-10 right-10 flex flex-col items-end space-y-md z-20">
+<div class="p-lg bg-surface-container-lowest rounded-2xl shadow-xl border border-outline-variant max-w-xs">
+<div class="flex items-center mb-sm">
+<span class="material-symbols-outlined text-primary mr-sm" style="font-variation-settings: 'FILL' 1;">auto_awesome</span>
+<span class="font-bold text-sm">Foundry AI Tip</span>
+</div>
+<p class="text-xs text-on-surface-variant leading-relaxed">Based on your "Advanced React" progress, we suggest exploring "State Management" as an elective path next week.</p>
+</div>
+<div class="flex space-x-sm">
+<button class="w-12 h-12 rounded-full bg-white shadow-lg border border-outline-variant flex items-center justify-center hover:bg-primary/5">
+<span class="material-symbols-outlined text-on-surface-variant">zoom_in</span>
+</button>
+<button class="w-12 h-12 rounded-full bg-white shadow-lg border border-outline-variant flex items-center justify-center hover:bg-primary/5">
+<span class="material-symbols-outlined text-on-surface-variant">zoom_out</span>
+</button>
+<button class="w-12 h-12 rounded-full bg-primary-container text-white shadow-lg flex items-center justify-center hover:scale-110 transition-transform">
+<span class="material-symbols-outlined">center_focus_strong</span>
+</button>
+</div>
+</div>
+</div>
+</main>
+</div>
+<!-- Floating Micro-interactions Script -->
+<script>
+        document.addEventListener('mousemove', (e) => {
+            const cards = document.querySelectorAll('.node-card');
+            const x = (window.innerWidth / 2 - e.pageX) / 50;
+            const y = (window.innerHeight / 2 - e.pageY) / 50;
+            
+            cards.forEach(card => {
+                const rect = card.getBoundingClientRect();
+                const cardCenterX = rect.left + rect.width / 2;
+                const cardCenterY = rect.top + rect.height / 2;
+                
+                // Only apply parallax if cards are visible/on screen
+                if (rect.top < window.innerHeight && rect.bottom > 0) {
+                    // Small floating effect
+                }
+            });
+        });
+
+        // Initialize progress bars with a small delay for animation feel
+        window.addEventListener('load', () => {
+            const bars = document.querySelectorAll('.bg-gradient-to-r');
+            bars.forEach(bar => {
+                const width = bar.style.width;
+                bar.style.width = '0%';
+                setTimeout(() => {
+                    bar.style.transition = 'width 1.5s cubic-bezier(0.65, 0, 0.35, 1)';
+                    bar.style.width = width;
+                }, 500);
+            });
+        });
+    </script>
+</body></html>

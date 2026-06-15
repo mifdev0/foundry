@@ -1,0 +1,52 @@
+@import "@xyflow/react/dist/style.css";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: #f8f7ff;
+  color: #131b2e;
+}
+
+.dot-grid {
+  background-image: radial-gradient(#ccc3d8 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.foundry-flow .react-flow__pane {
+  cursor: grab;
+}
+
+.foundry-flow .react-flow__pane:active {
+  cursor: grabbing;
+}
+
+.foundry-flow .react-flow__attribution {
+  display: none;
+}
+
+.foundry-flow .react-flow__handle {
+  width: 10px;
+  height: 10px;
+  border: 2px solid #fff;
+  background: #7c3aed;
+}
+
+.foundry-flow .react-flow__edge-path {
+  stroke-linecap: round;
+}
+
+.content-editable:empty::before {
+  content: attr(data-placeholder);
+  color: #94a3b8;
+}
