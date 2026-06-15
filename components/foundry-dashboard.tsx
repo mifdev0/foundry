@@ -693,15 +693,21 @@ export default function FoundryDashboard() {
         const next = items.map((roadmap) =>
           roadmap.id === activeId ? { ...roadmap, nodes: applyLocks(nodes, edges), edges, updatedAt: new Date().toISOString() } : roadmap
         );
+        const activeRoadmapToSave = next.find((roadmap) => roadmap.id === activeId);
         window.localStorage.setItem(scopedKey(currentUserId, "roadmaps"), JSON.stringify(next));
-        void getAuthHeaders().then((headers) => fetch("/api/roadmaps", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json", ...headers },
-          body: JSON.stringify({ roadmaps: next })
-        })).catch(() => undefined);
+        if (activeRoadmapToSave) {
+          void getAuthHeaders().then(async (headers) => {
+            const response = await fetch("/api/roadmaps", {
+              method: "PUT",
+              headers: { "Content-Type": "application/json", ...headers },
+              body: JSON.stringify({ roadmaps: [activeRoadmapToSave] })
+            });
+            if (!response.ok) throw new Error("Autosave roadmap gagal");
+          }).catch((error) => console.error(error));
+        }
         return next;
       });
-    }, 900);
+    }, 350);
     return () => {
       if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
     };

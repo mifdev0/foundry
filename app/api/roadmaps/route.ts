@@ -154,64 +154,97 @@ export async function PUT(request: Request) {
       return NextResponse.json({ ok: false, error: roadmapError.message }, { status: 503 });
     }
 
-    await supabase.from("node_dependencies").delete().eq("roadmap_id", roadmap.id);
-    await supabase.from("nodes").delete().eq("roadmap_id", roadmap.id);
+    const nodeRows = roadmap.nodes.map((node) => ({
+      id: node.id,
+      roadmap_id: roadmap.id,
+      title: node.data.title,
+      description: node.data.description,
+      status: node.data.status,
+      position_x: node.position.x,
+      position_y: node.position.y,
+      notes: node.data.notes,
+      order_index: node.data.orderIndex,
+      forge_passed: node.data.forgePassed,
+      forge_feedback: node.data.feedback ?? null,
+      cooldown_until: node.data.cooldownUntil ? new Date(node.data.cooldownUntil).toISOString() : null,
+      messages_json: node.data.messages
+    }));
 
-    if (roadmap.nodes.length) {
-      const { error: nodesError } = await supabase.from("nodes").insert(
-        roadmap.nodes.map((node) => ({
-          id: node.id,
-          roadmap_id: roadmap.id,
-          title: node.data.title,
-          description: node.data.description,
-          status: node.data.status,
-          position_x: node.position.x,
-          position_y: node.position.y,
-          notes: node.data.notes,
-          order_index: node.data.orderIndex,
-          forge_passed: node.data.forgePassed,
-          forge_feedback: node.data.feedback ?? null,
-          cooldown_until: node.data.cooldownUntil ? new Date(node.data.cooldownUntil).toISOString() : null,
-          messages_json: node.data.messages
-        }))
-      );
+    const nodeIds = nodeRows.map((node) => node.id);
+    const nodeIdSet = new Set(nodeIds);
+    const taskRows = roadmap.nodes.flatMap((node) =>
+      (node.data.tasks ?? []).map((task) => ({
+        id: task.id,
+        node_id: node.id,
+        roadmap_id: roadmap.id,
+        title: task.title,
+        completed: task.completed,
+        due_date: task.dueDate ?? null
+      }))
+    );
+    const taskIds = taskRows.map((task) => task.id);
+    const edgeRows = roadmap.edges
+      .filter((edge) => nodeIdSet.has(edge.source) && nodeIdSet.has(edge.target))
+      .map((edge) => ({
+        id: edge.id,
+        roadmap_id: roadmap.id,
+        from_node_id: edge.source,
+        to_node_id: edge.target
+      }));
+    const edgeIds = edgeRows.map((edge) => edge.id);
+
+    if (nodeRows.length) {
+      const { error: nodesError } = await supabase.from("nodes").upsert(nodeRows);
 
       if (nodesError) {
         return NextResponse.json({ ok: false, error: nodesError.message }, { status: 503 });
       }
 
-      const taskRows = roadmap.nodes.flatMap((node) =>
-        (node.data.tasks ?? []).map((task) => ({
-          id: task.id,
-          node_id: node.id,
-          roadmap_id: roadmap.id,
-          title: task.title,
-          completed: task.completed,
-          due_date: task.dueDate ?? null
-        }))
-      );
-
       if (taskRows.length) {
-        const { error: tasksError } = await supabase.from("tasks").insert(taskRows);
+        const { error: tasksError } = await supabase.from("tasks").upsert(taskRows);
 
         if (tasksError) {
           return NextResponse.json({ ok: false, error: tasksError.message }, { status: 503 });
         }
       }
-    }
 
-    if (roadmap.edges.length) {
-      const { error: edgesError } = await supabase.from("node_dependencies").insert(
-        roadmap.edges.map((edge) => ({
-          id: edge.id,
-          roadmap_id: roadmap.id,
-          from_node_id: edge.source,
-          to_node_id: edge.target
-        }))
-      );
+      if (edgeRows.length) {
+        const { error: edgesError } = await supabase.from("node_dependencies").upsert(edgeRows);
 
-      if (edgesError) {
-        return NextResponse.json({ ok: false, error: edgesError.message }, { status: 503 });
+        if (edgesError) {
+          return NextResponse.json({ ok: false, error: edgesError.message }, { status: 503 });
+        }
+      }
+
+      const staleEdgeQuery = supabase.from("node_dependencies").delete().eq("roadmap_id", roadmap.id);
+      const { error: staleEdgeError } = edgeIds.length ? await staleEdgeQuery.not("id", "in", `(${edgeIds.join(",")})`) : await staleEdgeQuery;
+
+      if (staleEdgeError) {
+        return NextResponse.json({ ok: false, error: staleEdgeError.message }, { status: 503 });
+      }
+
+      const staleTaskQuery = supabase.from("tasks").delete().eq("roadmap_id", roadmap.id);
+      const { error: staleTaskError } = taskIds.length ? await staleTaskQuery.not("id", "in", `(${taskIds.join(",")})`) : await staleTaskQuery;
+
+      if (staleTaskError) {
+        return NextResponse.json({ ok: false, error: staleTaskError.message }, { status: 503 });
+      }
+
+      const staleNodeQuery = supabase.from("nodes").delete().eq("roadmap_id", roadmap.id);
+      const { error: staleNodeError } = await staleNodeQuery.not("id", "in", `(${nodeIds.join(",")})`);
+
+      if (staleNodeError) {
+        return NextResponse.json({ ok: false, error: staleNodeError.message }, { status: 503 });
+      }
+    } else {
+      const tables = ["tasks", "node_dependencies", "nodes"] as const;
+
+      for (const table of tables) {
+        const { error: childError } = await supabase.from(table).delete().eq("roadmap_id", roadmap.id);
+
+        if (childError) {
+          return NextResponse.json({ ok: false, error: childError.message }, { status: 503 });
+        }
       }
     }
   }
