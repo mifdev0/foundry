@@ -130,10 +130,10 @@ const makeEdge = (source: string, target: string): Edge => ({
   id: `${source}-${target}`,
   source,
   target,
-  type: "smoothstep",
-  animated: true,
+  type: "bezier",
+  animated: false,
   markerEnd: { type: MarkerType.ArrowClosed, color: "#8127cf" },
-  style: { stroke: "#8127cf", strokeWidth: 2, strokeDasharray: "8 8" }
+  style: { stroke: "#8127cf", strokeWidth: 2.25 }
 });
 
 function makeDefaultTasks(title: string, _description = ""): TaskItem[] {
@@ -683,6 +683,25 @@ export default function FoundryDashboard() {
   const activeRoadmap = roadmaps.find((roadmap) => roadmap.id === activeId);
   const selectedNode = useMemo(() => nodes.find((node) => node.id === selectedNodeId) ?? null, [nodes, selectedNodeId]);
   const selectedNodeTasks = selectedNode?.data.tasks ?? [];
+  const visibleEdges = useMemo(
+    () =>
+      edges.map((edge) => {
+        const selected = edge.id === selectedEdgeId;
+        return {
+          ...edge,
+          type: "bezier",
+          animated: selected,
+          markerEnd: { type: MarkerType.ArrowClosed, color: selected ? "#5B21B6" : "#8127cf" },
+          style: {
+            ...edge.style,
+            stroke: selected ? "#5B21B6" : "#8127cf",
+            strokeWidth: selected ? 3 : 2.25,
+            strokeDasharray: selected ? "7 7" : undefined
+          }
+        };
+      }),
+    [edges, selectedEdgeId]
+  );
   const progress = nodes.length ? Math.round((nodes.filter((node) => node.data.status === "completed").length / nodes.length) * 100) : 0;
   const roadmapProgress = useCallback((roadmap: Roadmap) => {
     const total = roadmap.nodes.length;
@@ -757,7 +776,7 @@ export default function FoundryDashboard() {
   const onConnect = useCallback(
     (connection: Connection) => {
       setEdges((items) => {
-        const next = addEdge({ ...connection, type: "smoothstep", animated: true, markerEnd: { type: MarkerType.ArrowClosed, color: "#7C3AED" }, style: { stroke: "#7C3AED", strokeWidth: 2, strokeDasharray: "8 8" } }, items);
+        const next = addEdge({ ...connection, type: "bezier", animated: false, markerEnd: { type: MarkerType.ArrowClosed, color: "#7C3AED" }, style: { stroke: "#7C3AED", strokeWidth: 2.25 } }, items);
         setNodes((nodeItems) => applyLocks(nodeItems, next));
         return next;
       });
@@ -1388,12 +1407,16 @@ export default function FoundryDashboard() {
             <ReactFlow
               className="foundry-flow"
               nodes={nodes}
-              edges={edges}
+              edges={visibleEdges}
               nodeTypes={nodeTypes}
               onNodesChange={onNodesChange}
               onEdgesChange={onEdgesChange}
               onConnect={onConnect}
               onlyRenderVisibleElements
+              onPaneClick={() => {
+                setSelectedNodeId(null);
+                setSelectedEdgeId(null);
+              }}
               onNodeClick={(_, node) => {
                 if (node.data.locked) {
                   setSelectedNodeId(null);
