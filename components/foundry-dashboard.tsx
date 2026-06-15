@@ -959,6 +959,15 @@ export default function FoundryDashboard() {
     const updated = roadmaps.map((r) => r.id === renameRoadmapId ? { ...r, title: renameRoadmapTitle.trim(), updatedAt: new Date().toISOString() } : r);
     setRoadmaps(updated);
     window.localStorage.setItem(scopedKey(currentUserId, "roadmaps"), JSON.stringify(updated));
+    void getAuthHeaders()
+      .then((headers) =>
+        fetch("/api/roadmaps", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", ...headers },
+          body: JSON.stringify({ roadmaps: updated })
+        })
+      )
+      .catch(() => undefined);
     setRenameRoadmapId(null);
     setRenameRoadmapTitle("");
   };
