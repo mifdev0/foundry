@@ -94,6 +94,7 @@ type SkillData = {
   notes: string;
   orderIndex: number;
   locked: boolean;
+  isolated?: boolean;
   forgePassed: boolean;
   forgeCaseStudy?: ForgeCaseStudy;
   forgeStartedAt?: number;
@@ -423,7 +424,8 @@ function applyLocks(nodes: SkillNode[], edges: Edge[]) {
   return nodes.map((node) => {
     const prerequisites = edges.filter((edge) => edge.target === node.id).map((edge) => nodes.find((item) => item.id === edge.source));
     const locked = prerequisites.some((item) => !item || item.data.status !== "completed" || !item.data.forgePassed);
-    return { ...node, data: { ...node.data, locked } };
+    const isolated = !edges.some((edge) => edge.source === node.id || edge.target === node.id);
+    return { ...node, data: { ...node.data, locked, isolated } };
   });
 }
 
@@ -445,7 +447,8 @@ function SkillCard({ data, selected }: NodeProps<SkillNode>) {
       className={clsx(
         "glass-card relative w-[320px] overflow-hidden rounded-[20px] p-6 transition-all duration-300",
         selected && "ring-2 ring-secondary ring-offset-4 ring-offset-transparent shadow-secondary-glow",
-        data.locked && "opacity-60 grayscale-[0.5]"
+        data.locked && "opacity-60 grayscale-[0.5]",
+        !data.locked && data.isolated && data.status === "completed" && "opacity-65 saturate-[0.55]"
       )}
     >
       <div className="node-accent" style={{ backgroundColor: meta.color }} />
